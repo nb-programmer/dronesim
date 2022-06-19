@@ -22,6 +22,11 @@ EXTRAS = {
     "gym": ["gym"]
 }
 
+PACKAGE_DATA = {
+    'assets':['*'],
+    'shaders':['*']
+}
+
 long_desc = DESCRIPTION
 try:
     BASEPATH = os.path.abspath(os.path.dirname(__file__))
@@ -36,6 +41,7 @@ setup(
     description=DESCRIPTION,
     long_description=long_desc,
     packages=find_packages(),
+    package_data=PACKAGE_DATA,
     url=URL,
     license='MIT',
     author=AUTHOR,
