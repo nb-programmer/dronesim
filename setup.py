@@ -9,13 +9,16 @@ URL = 'https://github.com/nb-programmer/dronesim'
 EMAIL = 'narayanband1356@gmail.com'
 AUTHOR = 'nb-programmer'
 REQUIRES_PYTHON = '>=3.7.0'
-VERSION = '0.1.0'
+VERSION = '0.1.2'
 
 REQUIRED = [
     'pygame',
     'PyOpenGL',
     'ffmpeg_python',
-    'numpy'
+    'numpy',
+    "matplotlib",
+    "PyGLM",
+    'bson'
 ]
 
 EXTRAS = {

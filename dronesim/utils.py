@@ -1,5 +1,8 @@
 
 import time
+import typing
+import numpy as np
+import enum
 
 _last_check_time = {}
 def callevery(check_every : float):
@@ -16,3 +19,17 @@ def callevery(check_every : float):
             return _last_check_time[f_name][2]
         return timed_func_call
     return timed_func_call_wrap
+
+
+#State (observation) type returned by the step function, based on Gym: (observation, reward, done?, info)
+StateType = typing.Tuple[typing.Any, int, bool, typing.Dict[str, typing.Any]]
+#Standard 4-value RC input (xyz velocity and yaw velocity)
+StepAction = typing.NamedTuple("StepAction", velx=float, vely=float, velz=float, velr=float)
+#StepAction in terms of list, tuple or Numpy array
+StepActionType = typing.Union[StepAction, typing.List, typing.Tuple, np.ndarray]
+
+class DroneState(enum.Enum):
+    LANDED = enum.auto()
+    TAKING_OFF = enum.auto()
+    IN_AIR = enum.auto()
+    LANDING = enum.auto()

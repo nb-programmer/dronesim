@@ -1,5 +1,6 @@
 
 import os
+from sre_parse import State
 from xml.dom.pulldom import START_DOCUMENT
 import numpy as np
 
@@ -11,7 +12,7 @@ from dronesim.render import pygl
 from OpenGL.GL import shaders as glsl
 
 # Simulated drone
-from dronesim import SimpleDroneSimulator, DroneState, SimRPC, SimulatedDroneHandler
+from dronesim import DroneSimulator, DroneState, SimRPC, SimulatedDroneHandler
 from dronesim.utils import callevery
 
 # Scene rendering
@@ -54,17 +55,18 @@ class SimulatedDroneRenderer(RenderableScene):
         Renders POV of drone's bottom camera in the current framebuffer
         '''
 
-        if not state: return
+        if state is None: return
+        observation, reward, done, info = state
 
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
         gl.glLoadIdentity()
 
         # Move camera with the drone
-        _dx, _dy, _dz, _da = state
+        (_dx, _dy, _dz), (_dax, _day, _daz) = info['state'][:2]
         self.camera.x = _dx
         self.camera.y = _dy
         self.camera.z = _dz + 0.06  # Camera slightly higher than drone's feet
-        self.camera.tilt = np.rad2deg(_da)
+        self.camera.tilt = np.rad2deg(_daz)
 
         # We are moving the world relative to the camera
         self.camera.performWorldTransform(viewport)
@@ -104,7 +106,7 @@ class SimulatedDroneRenderer(RenderableScene):
         gl.glVertex3fv((-100,100,0))
         gl.glEnd()
 
-def prepareHUD(surface : pygl.GLTexture, drone : SimpleDroneSimulator):
+def prepareHUD(surface : pygl.GLTexture, drone : DroneSimulator):
     font = pygame.font.Font(None, 64)
     textSurface = font.render("Test", True, (255,255,255,40),
                               (0,0,0,20))
@@ -138,8 +140,10 @@ class Action:
 if __name__ == "__main__":
     START_POSITION = (-0.9, 0, 0)
 
+    old_op = None
+
     #Drone simulator environment
-    drone = SimpleDroneSimulator(START_POSITION)
+    drone = DroneSimulator(START_POSITION)
     drone.reset()
 
     pygame.init()
@@ -172,7 +176,7 @@ if __name__ == "__main__":
 
     #TODO: Pass drone simulator directly to control
     droneHandler.setCommandHandler(myHandler)
-    droneStreamer.start()
+    #droneStreamer.start()
 
     #Takeoff immediately
     #drone.takeoff()
@@ -253,7 +257,7 @@ if __name__ == "__main__":
             binding['rr']['value'] - binding['rl']['value']
         ]
 
-    def performDroneActionFromBind(action : str, drone : SimpleDroneSimulator):
+    def performDroneActionFromBind(action : str, drone : DroneSimulator):
         if action == 'tk':
             drone.takeoff()
         elif action == 'ld':
@@ -309,16 +313,21 @@ if __name__ == "__main__":
             else:
                 droneAction.action_set = [0,0,0,0]
 
-        state, reward, done, info = drone.step(droneAction.action_set)
+        state = drone.step(droneAction.action_set)
+        observation, reward, done, info = state
 
         #TODO: Drone's status to be defined in protocol
         cli_state = {
-            'pos': state,
+            'pos': info['state'].tolist(),
+            'obs': observation,
             'fl': drone.operation == DroneState.IN_AIR,
             'st': True,
             'b': 100
         }
-        sendStateInfo(droneHandler, cli_state)
+        if old_op != drone.operation:
+            print("State changed to", drone.operation)
+            old_op = drone.operation
+        #sendStateInfo(droneHandler, cli_state)
 
         #Render for camera input, then for the user
         droneRenderer.renderToFrameBuffer(state=state)
