@@ -62,7 +62,7 @@ class SimulatedDroneRenderer(RenderableScene):
         gl.glLoadIdentity()
 
         # Move camera with the drone
-        (_dx, _dy, _dz), (_dax, _day, _daz) = info['state'][:2]
+        (_dx, _dy, _dz), (_dax, _day, _daz) = info['state']['pos'], info['state']['angle']
         self.camera.x = _dx
         self.camera.y = _dy
         self.camera.z = _dz + 0.06  # Camera slightly higher than drone's feet
@@ -137,7 +137,7 @@ class Action:
 
 # Drone simulator window launcher
 
-if __name__ == "__main__":
+def main():
     START_POSITION = (-0.9, 0, 0)
 
     old_op = None
@@ -318,7 +318,7 @@ if __name__ == "__main__":
 
         #TODO: Drone's status to be defined in protocol
         cli_state = {
-            'pos': info['state'].tolist(),
+            'pos': info['state']['pos'],
             'obs': observation,
             'fl': drone.operation == DroneState.IN_AIR,
             'st': True,
@@ -340,3 +340,6 @@ if __name__ == "__main__":
 
     droneStreamer.stop()
     pygame.quit()
+
+if __name__ == "__main__":
+    main()

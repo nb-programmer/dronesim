@@ -9,6 +9,7 @@ from dronesim.utils import DroneState, StepAction, StepActionType
 
 #4-dimension PID control
 Vec4PID = typing.NamedTuple('VEC4DOFPID', x=PID, y=PID, z=PID, w=PID)
+PhysicsStateType = typing.Dict[str, typing.Any]
 
 class DronePhysicsEngine:
     def __init__(self):
@@ -26,28 +27,34 @@ class DronePhysicsEngine:
     def state(self): return self._state
 
     def reset(self, *args, **kwargs) -> typing.Any:
-        self._state = np.zeros((2,3))
+        self._state : PhysicsStateType = {'pos': (0,0,0)}
         return self._state
     def step(self, action : typing.Union[StepActionType, typing.Any], dt : float = None) -> typing.Any: raise NotImplementedError()
     def takeoff(self): raise NotImplementedError()
     def land(self): raise NotImplementedError()
 
 class SimpleDronePhysics(DronePhysicsEngine):
+    '''
+    Not really that simple :)
+    '''
+    
     GRAVITY = glm.vec3(0, 0, -1e-3)
     AIR_RESISTANCE = glm.vec3((0.95,)*3)
     #Angle is counter-clockwise from 3 o'clock position, so negate the magnitude to turn properly
     RC_SCALE = glm.vec4(0.009, 0.009, 0.005, -0.018)
+    
+    #PID controller parameters
     STRAFE_CONTROL_PARAM = {'Kp': 0.45, 'Ki': 0.01, 'Kd': 0.0}
     LIFT_CONTROL_PARAM = {'Kp': 0.002, 'Ki': 0.002, 'Kd': 0.0}
     TURN_CONTROL_PARAM = {'Kp': 0.99, 'Ki': 0.01, 'Kd': 0.0}
 
-    def reset(self, start_pos : np.ndarray, start_rot : np.ndarray) -> np.ndarray:
+    def reset(self, start_pos : np.ndarray, start_rot : np.ndarray) -> PhysicsStateType:
         #Position of the drone in space
         self.pos = glm.vec3(start_pos)
         self.angle = glm.vec3(start_rot)
         #Instantaneous velocity
         self.pvel = glm.vec4(0,0,0,1)
-        self.fvel = glm.vec3(0,0,0)
+        self.fvel = glm.vec3()
         self.avel = glm.vec3()
 
         #Thrust to apply
@@ -61,8 +68,6 @@ class SimpleDronePhysics(DronePhysicsEngine):
             PID(**self.TURN_CONTROL_PARAM)
         )
 
-        #[[pos_xyz][angle_xyz][pos_vel_xyz][facing_vel_xyz]]
-        self._state = np.zeros((4,3))
         self._updateState()
 
         #Landed, stationary
@@ -71,10 +76,15 @@ class SimpleDronePhysics(DronePhysicsEngine):
         return self.state
 
     def _updateState(self):
-        self._state[:] = (self.pos, self.angle, self.pvel.xyz, self.fvel)
+        self._state : PhysicsStateType = {
+            'pos': self.pos,
+            'angle': self.angle,
+            'absvel': self.pvel.xyz,
+            'relvel': self.fvel
+        }
         return self.state
 
-    def step(self, action : StepAction, dt : float = None) -> np.ndarray:
+    def step(self, action : StepAction, dt : float = None) -> PhysicsStateType:
         #We want to use only StepAction for this engine
         action = self._toStepAction(action)
 
@@ -89,25 +99,12 @@ class SimpleDronePhysics(DronePhysicsEngine):
         is_on_surface = False
         is_accept_rc = False
 
-        #Takeoff / landing procedure
-        '''if self._operation == DroneState.LANDED:
-            is_on_surface = True
-        elif self._operation == DroneState.TAKING_OFF:
-            pass
-        elif self._operation == DroneState.IN_AIR:
-            is_accept_rc = True
-        elif self._operation == DroneState.LANDING:
-            err = (0.2 - self.pos.z)
-            rc_vec.z = err * 0.009
-            if abs(err) < 0.02:
-                self._operation = DroneState.LANDED'''
-
         #RC thrust control
         self.control.x.setpoint = rc_vec.x
         self.control.y.setpoint = rc_vec.y
         self.control.w.setpoint = rc_vec.w
         self.control.z.setpoint += rc_vec.z
-        
+
         #Apply thrust based on target position
         self.thrust_vec.x = self.control.x(self.pvel.x, dt)
         self.thrust_vec.y = self.control.y(self.pvel.y, dt)

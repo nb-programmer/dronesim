@@ -30,6 +30,10 @@ class EKFSensor:
     def update(self):
         pass
 
+class CameraSensor:
+    def update(self):
+        pass
+
 if __name__ == "__main__":
     np.random.seed(0)
     x = AerialEffects()
@@ -89,13 +93,11 @@ class DroneSimulator:
 
         The 'observation' parameter is the value obtained from the currently active objective (if any), or None.
 
-        Also note that the shape of the 'state' field depends on the physics engine,
-        but it is guaranteed to be of shape (2,3) minimum, which means it will at least have the
-        position vector and angle vector in [[[x,y,z][x,y,z]]] format.
+        In the 'info' part, the 'state' field depends on the physics engine, and can define its own properties.
+        You can expect it to contain at least 'pos' field with a 3-D vector of some sorts.
+
+        Other fields in info may include state of various sensors attached and the 'operation' enum value
         
-        Other data may be added by the Physics engine to further indices of the
-        first axis (the '2' will be a higher number). For example, the SimpleDronePhysics engine
-        uses the shape (4,3), where the last two indices contains instantaneous velocity of position and velocity.
         '''
         return (None, 0, False, {'state': self.state, 'operation': self.operation, 'ekf': self.ekf, **self.__ext_state})
 

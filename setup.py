@@ -30,6 +30,8 @@ PACKAGE_DATA = {
     'shaders':['*']
 }
 
+PACKAGE_ENTRY_SCRIPTS = ['dronesim = dronesim.__main__:main' ]
+
 long_desc = DESCRIPTION
 try:
     BASEPATH = os.path.abspath(os.path.dirname(__file__))
@@ -45,6 +47,7 @@ setup(
     long_description=long_desc,
     packages=find_packages(),
     package_data=PACKAGE_DATA,
+    entry_points={ 'console_scripts': PACKAGE_ENTRY_SCRIPTS },
     url=URL,
     license='MIT',
     author=AUTHOR,
