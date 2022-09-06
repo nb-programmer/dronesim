@@ -15,10 +15,16 @@ pip install git+https://github.com/nb-programmer/dronesim.git
 
 Run the default simulator which launches a window with keyboard controls, Video stream though UDP and a scene with an elliptical path to traverse.
 
-To run the simulator, execute the package using the Python interpreter:
+To run the simulator, call the package name in the terminal:
 
 ```bash
-python -m dronesim
+$ dronesim
+```
+
+Or alternatively, execute the package using the Python interpreter:
+
+```bash
+$ python -m dronesim
 ```
 
 Use the keyboard to control the drone, with the following binds:
