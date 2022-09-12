@@ -26,8 +26,7 @@ EXTRAS = {
 }
 
 PACKAGE_DATA = {
-    'assets':['*'],
-    'shaders':['*']
+    NAME: ['assets/*', "shaders/*.fs", "shaders/*.vs"]
 }
 
 PACKAGE_ENTRY_SCRIPTS = ['dronesim = dronesim.__main__:main' ]
