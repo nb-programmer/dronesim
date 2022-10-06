@@ -1,5 +1,5 @@
 
-from dronesim.render.scene import RenderableScene
+from .scene import RenderableScene
 
 import threading
 import subprocess

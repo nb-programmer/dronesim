@@ -46,7 +46,7 @@ class GLModel:
         mvp = self._calculate_mvp(view_matrix, projection_matrix)
         self._renderModel(mvp)
 
-    def _renderModel(self): pass
+    def _renderModel(self, mvp : np.ndarray): pass
 
 class GLMesh(GLModel):
     def __init__(self, mesh_data : GLBuffer):

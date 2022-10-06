@@ -2,17 +2,13 @@
 import pygame
 
 #Object-oriented GL library
-import dronesim.render.pygl as pygl
-from .camera import Camera
+from ..render import pygl, Dimension
+from ..render.camera import Camera
 
 from OpenGL import GL as gl
 from OpenGL import GLU as glu
 
 import numpy as np
-
-from typing import Tuple
-
-Dimension = Tuple[int, int]
 
 class RenderableScene(pygame.Surface):
     def __init__(self, *args, size : Dimension = (320, 240), **kwargs):
@@ -24,14 +20,14 @@ class RenderableScene(pygame.Surface):
         self._fbdata = None
         self.renderInit()
     def renderInit(self): pass
-    def renderScene(viewport : Dimension, *args, **kwargs): pass
+    def renderScene(self, viewport : Dimension, *args, **kwargs): pass
     def render(self, viewport : Dimension, *args, **kwargs):
         self.renderScene(viewport, *args, **kwargs)
     def isReady(self):
         return self._fbdata is not None
     def renderToFrameBuffer(self, pixel_format : gl.GLuint = gl.GL_BGR, to_array : bool = False, *args, **kwargs):
         with self.fbuf:
-            self.renderScene(viewport = self.get_size(), *args, **kwargs)
+            self.renderScene(self.get_size(), *args, **kwargs)
             self._fbdata = gl.glReadPixels(0, 0, *self.get_size(), pixel_format, gl.GL_UNSIGNED_BYTE)
             if to_array and self.isReady():
                 return self.readFBArray()

@@ -16,8 +16,9 @@ REQUIRED = [
     'PyOpenGL',
     'ffmpeg_python',
     'numpy',
-    "matplotlib",
-    "PyGLM",
+    'matplotlib',
+    'PyGLM',
+    'simple-pid',
     'bson'
 ]
 

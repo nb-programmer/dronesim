@@ -2,8 +2,8 @@
 import typing
 import numpy as np
 
-from dronesim.physics import DronePhysicsEngine, SimpleDronePhysics
-from dronesim.utils import StateType, StepAction, StepActionType
+from .physics import DronePhysicsEngine, SimpleDronePhysics
+from .utils import StateType, StepAction, StepActionType
 
 class AerialEffects:
     def __init__(self):
@@ -33,20 +33,7 @@ class EKFSensor:
 class CameraSensor:
     def update(self):
         pass
-
-if __name__ == "__main__":
-    np.random.seed(0)
-    x = AerialEffects()
-    vel = np.zeros(4)
-    x.applyShakeEffect(vel)
-    print(vel)
-    x.applyShakeEffect(vel)
-    print(vel)
-    x.applyShakeEffect(vel)
-    print(vel)
-
-#TODO: Separate EKF measurements from control velocity (this was a hack)
-
+    
 class DroneSimulator:
     TAKEOFF_ALTITUDE = 2.0
 
@@ -54,30 +41,22 @@ class DroneSimulator:
         start_pos : typing.Union[np.ndarray, typing.List, typing.Tuple] = (0,0,0),
         start_rot : typing.Union[np.ndarray, typing.List, typing.Tuple] = (0,0,0),
         physics_engine : DronePhysicsEngine = None,
-        additional_sensors : typing.Dict[str, typing.Any] = {}
+        **additional_sensors : typing.Any
     ):
         self.init_pos = np.array(start_pos).flatten()
         self.init_rot = np.array(start_rot).flatten()
         self.init_pos.resize(3)
         self.init_rot.resize(3)
 
-        self.__physics : DronePhysicsEngine = None
+        self.__physics : DronePhysicsEngine = physics_engine
         self.__sensors = {'ekf0': None, **additional_sensors}
         self.__ext_state = {}
-
-        self._initPhysics(physics_engine)
-        self._initSensors()
-
+        
+        if self.__physics is None:
+            self.__physics = SimpleDronePhysics()
+            
         self.reset()
-
-    def _initSensors(self):
-        pass
-
-    def _initPhysics(self, physics_engine : DronePhysicsEngine):
-        if physics_engine is None:
-            physics_engine = SimpleDronePhysics()
-        self.__physics = physics_engine
-
+        
     def step(self, action : StepActionType = None) -> StateType:
         if action is None:
             #Use default action (halt motion) if not provided
@@ -85,11 +64,12 @@ class DroneSimulator:
 
         self.__physics.step(action)
 
-        return self._getState()
+        return self.getState()
 
-    def _getState(self) -> StateType:
+    def getState(self) -> StateType:
         '''
-        Get the current state of the drone simulator from the objective and physics engine.
+        Get the current state of the drone simulator from the objective and physics engine, according to the Gym specifications:
+            (observation, reward, done, info)
 
         The 'observation' parameter is the value obtained from the currently active objective (if any), or None.
 
@@ -99,24 +79,17 @@ class DroneSimulator:
         Other fields in info may include state of various sensors attached and the 'operation' enum value
         
         '''
-        return (None, 0, False, {'state': self.state, 'operation': self.operation, 'ekf': self.ekf, **self.__ext_state})
+        return (None, 0, False, {'state': self.state, 'operation': self.operation, 'sensors': self.__ext_state})
 
     def reset(self):
         #Reset the physics engine to set-up the initial state
         self.__physics.reset(start_pos=self.init_pos, start_rot=self.init_rot)
+        self._updateSensors()
 
-        #Additional EKF "sensor"
-        #TODO: Remove this
-        self.ekf = {
-            'velocity': {
-                'x': 0.0,
-                'y': 0.0,
-                'z': 0.0,
-                'rot': 0.0
-            }
-        }
+        return self.getState()
 
-        return self._getState()
+    def _updateSensors(self):
+        self.__ext_state = {sensor_name : None for sensor_name, sensor in self.__sensors.items()}
 
     #Physics engine API passthrough
 
