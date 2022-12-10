@@ -4,33 +4,34 @@ import os
 
 # Package meta-data.
 NAME = 'dronesim'
-DESCRIPTION = 'Simulate a drone with visualization, POV streaming and network control'
+DESCRIPTION = 'Simulate a UAV for AI applications in 3D environments'
 URL = 'https://github.com/nb-programmer/dronesim'
 EMAIL = 'narayanband1356@gmail.com'
 AUTHOR = 'nb-programmer'
 REQUIRES_PYTHON = '>=3.7.0'
-VERSION = '0.1.2'
+VERSION = '0.3.0'
+LICENSE = 'MIT'
 
 REQUIRED = [
-    'pygame',
-    'PyOpenGL',
-    'ffmpeg_python',
-    'numpy',
-    'matplotlib',
-    'PyGLM',
-    'simple-pid',
-    'bson'
+    'Panda3D',              #The 3D game engine that does all the heavy lifting of rendering
+    'panda3d-gltf',         #Model export format support for gltf/glb models
+    'panda3d-simplepbr',    #Physically Based Rendering (PBR) model support (Blender-exported models)
+    'numpy',                #Number manipulation and some math functions
+    'PyGLM',                #Matrix and vector math
+    'simple-pid',           #PID controller for physics engines
+    'matplotlib'            #To plot target vs actual to tune PID coefficients
 ]
 
 EXTRAS = {
-    "gym": ["gym"]
+    "gym": ["gym"],         #Optional Gym environment support
+    "cv": ["opencv-python"] #For some objectives
 }
 
 PACKAGE_DATA = {
-    NAME: ['assets/*', "shaders/*.fs", "shaders/*.vs"]
+    NAME: ['assets/*']      #Models and scenes
 }
 
-PACKAGE_ENTRY_SCRIPTS = ['dronesim = dronesim.__main__:main' ]
+PACKAGE_ENTRY_SCRIPTS = [ 'dronesim = dronesim.__main__:main' ]
 
 long_desc = DESCRIPTION
 try:
@@ -47,9 +48,9 @@ setup(
     long_description=long_desc,
     packages=find_packages(),
     package_data=PACKAGE_DATA,
-    entry_points={ 'console_scripts': PACKAGE_ENTRY_SCRIPTS },
+    entry_points={'console_scripts': PACKAGE_ENTRY_SCRIPTS},
     url=URL,
-    license='MIT',
+    license=LICENSE,
     author=AUTHOR,
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,

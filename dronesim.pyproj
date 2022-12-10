@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{52353933-be99-4062-8b68-48454b506051}</ProjectGuid>
     <ProjectHome />
-    <StartupFile>dronesim\__main__.py</StartupFile>
+    <StartupFile>examples\follow.py</StartupFile>
     <SearchPath />
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
@@ -20,18 +20,23 @@
     <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="dronesim\scene\scene_flat.py" />
+    <Compile Include="dronesim\interface\default.py" />
+    <Compile Include="dronesim\objective\objective.py" />
+    <Compile Include="examples\follow.py" />
+    <Compile Include="dronesim\interface\tello.py" />
+    <Compile Include="dronesim\physics\effect.py" />
+    <Compile Include="dronesim\physics\physicsbase.py" />
+    <Compile Include="dronesim\physics\simple.py" />
+    <Compile Include="dronesim\sensor\camera.py" />
+    <Compile Include="dronesim\sensor\motion.py" />
+    <Compile Include="dronesim\sensor\sensor.py" />
+    <Compile Include="dronesim\sensor\__init__.py" />
     <Compile Include="dronesim\simapp.py" />
-    <Compile Include="dronesim\control.py" />
-    <Compile Include="dronesim\objective.py" />
+    <Compile Include="dronesim\interface\control.py" />
+    <Compile Include="dronesim\objective\__init__.py" />
     <Compile Include="dronesim\physics\__init__.py" />
-    <Compile Include="dronesim\protocol.py" />
-    <Compile Include="dronesim\render\camera.py" />
-    <Compile Include="dronesim\render\pygl.py" />
-    <Compile Include="dronesim\scene\__init__.py" />
-    <Compile Include="dronesim\render\__init__.py" />
     <Compile Include="dronesim\simulator.py" />
-    <Compile Include="dronesim\stream.py" />
+    <Compile Include="dronesim\types.py" />
     <Compile Include="dronesim\utils.py" />
     <Compile Include="dronesim\__init__.py" />
     <Compile Include="dronesim\__main__.py" />
@@ -40,24 +45,19 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include=".gitignore" />
-    <Content Include="dronesim\assets\ceramic-tiles-texture-4.jpg" />
-    <Content Include="dronesim\assets\ceramic-tiles-texture-5.jpg" />
-    <Content Include="dronesim\assets\loop.png" />
-    <Content Include="dronesim\shaders\fragment.frag" />
-    <Content Include="dronesim\shaders\vertex.vert" />
     <Content Include="MANIFEST.in" />
     <Content Include="README.md" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="dronesim" />
-    <Folder Include="dronesim\assets" />
-    <Folder Include="dronesim\scene\" />
+    <Folder Include="dronesim\interface\" />
+    <Folder Include="dronesim\sensor\" />
+    <Folder Include="dronesim\objective\" />
     <Folder Include="dronesim\physics" />
-    <Folder Include="dronesim\render" />
-    <Folder Include="dronesim\shaders\" />
     <Folder Include="examples" />
   </ItemGroup>
   <ItemGroup>
+    <InterpreterReference Include="Global|PythonCore|3.9" />
     <InterpreterReference Include="Global|VisualStudio|Work venv (Python 3.9 (64-bit))" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />

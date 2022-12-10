@@ -1,3 +1,0 @@
-
-class DronePOVObjective:
-    pass
