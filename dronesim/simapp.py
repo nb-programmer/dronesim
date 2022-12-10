@@ -34,6 +34,7 @@ from dataclasses import dataclass
 #Default config data
 DEFAULT_CONFIG_VARS = """
 win-size 1280 720
+vfs-case-sensitive 0
 window-title Drone Simulator
 texture-minfilter mipmap
 texture-anisotropic-degree 16
