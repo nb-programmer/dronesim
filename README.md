@@ -3,6 +3,9 @@
 This package includes modules and tools to simulate an aerial vehicle similar to a quadcopter, and
 makes it easy to use it for various A.I. applications such as path following, obstacle avoidance, etc.
 
+It comes with a bunch of sensors that can be attached to the UAV, such as a Camera (RGB and Depth), IMU (motion), and more to come.
+The simulator can have an "objective" set to generate observations for machine learning applications.
+
 ## Installation
 
 Install the package using pip from :
@@ -13,7 +16,7 @@ pip install git+https://github.com/nb-programmer/dronesim.git
 
 ## Usage
 
-Run the default simulator which launches a window with keyboard controls, Video stream though UDP and a scene with an elliptical path to traverse.
+Run the default simulator which launches a window with keyboard controls and a scene with an elliptical path to traverse.
 
 To run the simulator, call the package name in the terminal:
 
@@ -27,11 +30,30 @@ Or alternatively, execute the package using the Python interpreter:
 $ python -m dronesim
 ```
 
-Use the keyboard to control the drone, with the following binds:
+Refer to the `examples/` folder for running the simulator with custom controllers
+
+## Controls
+
+### Simulator controls
+
+Use the keyboard and mouse to interact with the simulator app.
+
+The default mouse control is set to `Free mode` with mouse for looking.
 
 Key|Action
 ---|---
-R|Reset simulator state
+Esc|Unlock/Lock and Show/Hide mouse
+F3|Show debug data
+F5|Change camera mode from one of three [Free, First Person and Third Person]
+F6|Toggle control between camera and UAV
+F11|Toggle fullscreen
+
+### Default drone controls
+
+Use the keyboard to control the drone or camera, with the following binds:
+
+Key|Action
+---|---
 I|Take off
 K|Land
 W|Move forwards

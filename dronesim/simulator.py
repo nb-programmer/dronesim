@@ -4,7 +4,8 @@ from .sensor import SensorBase
 from .objective import ObjectiveBase
 from .types import StateType, StepActionType
 
-from .sensor.motion import EKFSensor
+#Default sensors to attach
+from .sensor.motion import IMUSensor
 
 import typing
 
@@ -29,7 +30,7 @@ class DroneSimulator:
         
         #Sensor attachment
         if default_sensors:
-            self.addSensor(ekf0 = EKFSensor())
+            self.addSensor(ekf0 = IMUSensor())
 
         self.addSensor(**additional_sensors)
 

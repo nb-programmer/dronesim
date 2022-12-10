@@ -310,8 +310,7 @@ class UAVDroneModel(Actor):
                     bone['bone'].setH(bone['bone'].getH() + prop_vel*bone['spinDir'])
 
         super().update()
-
-#TODO: Support multiple drone actors using tuple of (IDroneControllable, Actor) pairs
+        
 class SimulatorApplication(ShowBase):
     '''
     '''

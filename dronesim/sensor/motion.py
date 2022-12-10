@@ -1,6 +1,6 @@
 from .sensor import SensorBase
 
-class EKFSensor(SensorBase):
+class IMUSensor(SensorBase):
     def update(self):
         pass
 
