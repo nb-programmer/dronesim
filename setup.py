@@ -28,7 +28,7 @@ EXTRAS = {
 }
 
 PACKAGE_DATA = {
-    NAME: ['assets/*']      #Models and scenes
+    NAME: ['assets/**']     #Models and scenes
 }
 
 PACKAGE_ENTRY_SCRIPTS = [ 'dronesim = dronesim.__main__:main' ]
