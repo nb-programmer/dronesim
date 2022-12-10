@@ -1,7 +1,7 @@
 
 from dronesim import DroneSimulator
 from dronesim.simapp import SimulatorApplication
-from dronesim.interface.control import IDroneControllable
+from dronesim.interface import IDroneControllable
 from dronesim.types import DroneAction, StepRC
 from dronesim.sensor.camera import Panda3DCameraSensor
 

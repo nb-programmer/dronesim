@@ -21,6 +21,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="dronesim\interface\default.py" />
+    <Compile Include="dronesim\interface\__init__.py" />
     <Compile Include="dronesim\objective\objective.py" />
     <Compile Include="examples\follow.py" />
     <Compile Include="dronesim\interface\tello.py" />
@@ -40,7 +41,6 @@
     <Compile Include="dronesim\utils.py" />
     <Compile Include="dronesim\__init__.py" />
     <Compile Include="dronesim\__main__.py" />
-    <Compile Include="examples\example_control.py" />
     <Compile Include="setup.py" />
   </ItemGroup>
   <ItemGroup>

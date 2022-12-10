@@ -3,7 +3,7 @@ import argparse
 
 #Simulated drone
 from dronesim import DroneSimulator
-from dronesim.interface.default import DefaultDroneControl
+from dronesim.interface import DefaultDroneControl
 
 #App window
 from dronesim.simapp import SimulatorApplication
