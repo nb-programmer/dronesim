@@ -64,3 +64,19 @@ Up arrow|Increase altitude
 Down arrow|Decrease altitude
 Left arrow|Heading counter-clockwise
 Right arrow|Heading clockwise
+
+# TODO
+
+Pretty long at the moment
+
+- [ ] Complete movement swap (camera to player)
+  - [ ] Implement UAV movement by user
+- [ ] Support for Ardupilot SITL interface
+  - [ ] Using Mavlink
+  - [ ] Using integrated SITL as optional dependency
+  - [ ] Using dronekit
+- [ ] Implement objectives
+- [ ] Implement sensor interface
+- [ ] Physics engine using Panda3D's bullet physics engine
+- [ ] Implement IMU and other sensors
+- [ ] Show crosshair
