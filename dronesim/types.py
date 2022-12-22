@@ -3,6 +3,7 @@ import typing
 import enum
 
 Vec3Tuple = typing.Tuple[float, float, float]
+Vec4Tuple = typing.Tuple[float, float, float, float]
 #State (observation) type returned by the step function, based on Gym: (observation, reward, done?, info)
 StateType = typing.Tuple[typing.Any, float, bool, typing.Dict[str, typing.Any]]
 #Standard 4-value RC input (xyz velocity and yaw velocity)

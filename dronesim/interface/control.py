@@ -1,5 +1,7 @@
 from abc import ABC
 
+from ..types import StepRC
+
 class IDroneControllable(ABC):
     '''
     Abstract class to be able to call drone commands and retrieve status information.
@@ -11,25 +13,21 @@ class IDroneControllable(ABC):
         pass
     def land(self):
         pass
-    def rc_control(self,
-        left_right_velocity: int = None,
-        forward_backward_velocity: int = None,
-        up_down_velocity: int = None,
-        yaw_velocity: int = None):
+    def rc_control(self, vector : StepRC):
         pass
     def get_current_state(self):
         pass
-    def move_left(self, x : int):
+    def move_left(self, x : float):
         pass
-    def move_right(self, x : int):
+    def move_right(self, x : float):
         pass
-    def move_up(self, x : int):
+    def move_up(self, x : float):
         pass
-    def move_down(self, x : int):
+    def move_down(self, x : float):
         pass
-    def rotate_clockwise(self, x : int):
+    def rotate_clockwise(self, x : float):
         pass
-    def rotate_counterclockwise(self, x : int):
+    def rotate_counterclockwise(self, x : float):
         pass
     def freeze(self):
         pass

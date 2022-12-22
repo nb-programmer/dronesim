@@ -60,10 +60,6 @@ class DroneSimulator:
         '''
         Mostly a passthough to the physics engine's step(), with update to the instance (metrics, etc.)
         '''
-        if action is None:
-            #Use default action if not provided
-            action = {}
-
         self.__physics.step(action)
         self.__metrics['ticks'] += 1
 
@@ -153,8 +149,8 @@ except ImportError:
 
 class DroneSimulatorGym(DroneSimulator, Env):
     metadata = {"render_modes": ["rgb_array"]}
-    def __init__(self, start_pos=(0,0,0)):
-        DroneSimulator.__init__(self, start_pos)
+    def __init__(self, *args, **kwargs):
+        DroneSimulator.__init__(self, *args, **kwargs)
         #TODO: Make observation space a property and get values from objective
         #self.action_space = spaces.Box(-1, 1, shape=(4,), dtype=np.float32)
         #self.observation_space = spaces.Box(np.negative(np.inf), np.inf, shape=(4,), dtype=np.float32)

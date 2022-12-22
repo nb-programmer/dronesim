@@ -8,6 +8,8 @@ from ..types import DroneState, DroneAction, StepActionType, StepRC
 class SimpleDronePhysics(DronePhysicsEngine):
     '''
     Not really that simple :)
+
+    Assume units are in centimeters when translating to irl unit
     '''
     
     GRAVITY = glm.vec3(0, 0, -1e-3)
@@ -79,7 +81,10 @@ class SimpleDronePhysics(DronePhysicsEngine):
             if op == DroneAction.TAKEOFF:
                 self._operation = DroneState.TAKING_OFF
                 self.control.z.setpoint = params.get("altitude", 10.0)
-        
+
+        if rcvec is None:
+            rcvec = StepRC(0,0,0,0)
+
         #Which direction to move using RC
         rc_vec = glm.vec4(rcvec)
         rc_vec = glm.clamp(rc_vec, -1, 1)
@@ -89,10 +94,10 @@ class SimpleDronePhysics(DronePhysicsEngine):
         is_accept_rc = False
 
         #RC thrust control
-        self.control.x.setpoint = rc_vec.x
-        self.control.y.setpoint = rc_vec.y
-        self.control.w.setpoint = rc_vec.w
-        self.control.z.setpoint += rc_vec.z #Absolute height
+        self.control.x.setpoint = rc_vec.x  # Target velocity
+        self.control.y.setpoint = rc_vec.y  # Target velocity
+        self.control.w.setpoint = rc_vec.w  # Target heading angle
+        self.control.z.setpoint += rc_vec.z # Absolute height
 
         #Apply thrust based on target position
         self.thrust_vec.x = self.control.x(self.pvel.x, dt)

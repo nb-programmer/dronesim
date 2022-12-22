@@ -20,6 +20,8 @@
     <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="dronesim\interface\ardupilot\sitl.py" />
+    <Compile Include="dronesim\interface\ardupilot\sitl_proxy.py" />
     <Compile Include="dronesim\interface\default.py" />
     <Compile Include="dronesim\interface\__init__.py" />
     <Compile Include="dronesim\objective\objective.py" />
@@ -51,6 +53,7 @@
   <ItemGroup>
     <Folder Include="dronesim" />
     <Folder Include="dronesim\interface\" />
+    <Folder Include="dronesim\interface\ardupilot\" />
     <Folder Include="dronesim\sensor\" />
     <Folder Include="dronesim\objective\" />
     <Folder Include="dronesim\physics" />

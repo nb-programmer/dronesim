@@ -19,9 +19,9 @@ from direct.gui.OnscreenText import OnscreenText
 from direct.task.Task import Task
 
 from . import PACKAGE_BASE
-from .simulator import DroneSimulator
 from .interface.control import IDroneControllable
 from .utils import IterEnumMixin, HUDMixin, rad2deg
+from .types import Vec4Tuple
 
 import os
 import glm
@@ -122,24 +122,13 @@ class CameraControlBase:
         props.setCursorHidden(False)
         props.setMouseMode(WindowProperties.M_absolute)
         self._app.win.requestProperties(props)
-    def _getMovementControlState(self):
-        #Returns if button is pressed
-        isDown : typing.Callable[[ButtonHandle], bool] = self._app.mouseWatcherNode.isButtonDown
-
-        btnFw = KeyboardButton.ascii_key('w')
-        btnBw = KeyboardButton.ascii_key('s')
-        btnL = KeyboardButton.ascii_key('a')
-        btnR = KeyboardButton.ascii_key('d')
-        state_fwbw = (isDown(btnFw) - isDown(btnBw))
-        state_lr = (isDown(btnR) - isDown(btnL))
-
-        return (state_fwbw, state_lr, 0.0, 0.0)
 
 class FreeCam(CameraControlBase):
     def update(self,
                dt : float,
                flySpeed : float = 30.0,
                lookSensitivity : float = 2000.0,
+               mvVec : Vec4Tuple = None,
                **kwargs):
         '''
         Implement Free camera (spectator view) movement
@@ -147,15 +136,15 @@ class FreeCam(CameraControlBase):
         hprVec = self._app.camera.getHpr()
         xyzVec = self._app.camera.getPos()
 
-        #Get user movement control
-        mvVec = self._getMovementControlState()
-        
+        if mvVec is None:
+            mvVec = (0,)*4
+
         if self.mouseLocked:
             mx, my = self._grabMouseLockRelative()
             #Mouse relative pitch and yaw
             hprVec[0] -= mx * lookSensitivity * dt
             hprVec[1] -= my * lookSensitivity * dt
-            
+
         self._app.camera.setHpr(hprVec)
 
         #Get updated camera matrix
@@ -164,8 +153,9 @@ class FreeCam(CameraControlBase):
         camRotVecFB.normalize()
         camRotVecLR.normalize()
 
-        #New camera position based on user control and camera facing direction
-        flyVec = camRotVecFB * mvVec[0] * flySpeed * dt + camRotVecLR * mvVec[1] * flySpeed * dt
+        #New camera position based on user control and camera facing direction.
+        #This allows movement in any direction
+        flyVec = camRotVecLR * mvVec[0] * flySpeed * dt + camRotVecFB * mvVec[1] * flySpeed * dt
         self._app.camera.setPos(xyzVec + flyVec)
 
 class CameraMode(IterEnumMixin, enum.Enum):
@@ -213,10 +203,11 @@ class CameraController(HUDMixin):
             mouseLocked=self.mouseCapture
         )
 
-    def update(self, dt):
+    def update(self, dt, **kwargs):
         self.camMode.update(
             dt = dt,
-            flySpeed = self.flySpeed
+            flySpeed = self.flySpeed,
+            **kwargs
         )
 
 class UAVDroneModel(Actor):
@@ -354,6 +345,7 @@ class SimulatorApplication(ShowBase):
         self.droneState = None
         self.debuggerState = dict(visible=False, items={})
         self.HUDState = dict(visible=True)
+        self.movementState : Vec4Tuple = None
         
         self.accept("v", self.bufferViewer.toggleEnable)
         self.accept("V", self.bufferViewer.toggleEnable)
@@ -391,6 +383,8 @@ class SimulatorApplication(ShowBase):
 
     def updateEngine(self, task : Task):
         '''Update all objects in the app'''
+        self.movementState = self._getMovementControlState()
+        self._updatePlayerMovementCommand()
         self._updateDroneObject()
         self._updateCamera()
         self._updateHUD()
@@ -442,14 +436,48 @@ class SimulatorApplication(ShowBase):
         LOG.info("Changed control to '%s'" % self.camState.control)
         self.camState()
 
-    def eToggleFullscreen(self): pass
+    def eToggleFullscreen(self):
+        #FIXME native resolution and back
+        '''
+        new_wp = WindowProperties()
+        old_wp = base.win.getProperties()
+
+        #If already fullscreen, make windowed, else set to fullscreen
+        if old_wp.getFullscreen():
+            new_wp.setFullscreen(False)
+        else:
+            new_wp.setFullscreen(True)
+
+        new_wp.setSize(1920,1080)
+        base.win.requestProperties(new_wp)
+        '''
 
     def _updateDroneObject(self):
         self.droneState = self.drone.get_current_state()
         self.droneModel.update(self.droneState)
 
     def _updateCamera(self):
-        self.camState.update(globalClock.dt)
+        control = self.movementState if self.camState.control == ControllingCharacter.camera else None
+        self.camState.update(globalClock.dt, mvVec=control)
+
+    def _updatePlayerMovementCommand(self):
+        if self.camState.control == ControllingCharacter.player and self.movementState is not None:
+            self.drone.rc_control(self.movementState)
+
+    def _getMovementControlState(self) -> Vec4Tuple:
+        #Returns whether a button/key is pressed
+        isDown : typing.Callable[[ButtonHandle], bool] = self.mouseWatcherNode.isButtonDown
+
+        btnFw = KeyboardButton.ascii_key('w')
+        btnBw = KeyboardButton.ascii_key('s')
+        btnL = KeyboardButton.ascii_key('a')
+        btnR = KeyboardButton.ascii_key('d')
+
+        state_lr = (isDown(btnR) - isDown(btnL))
+        state_fwbw = (isDown(btnFw) - isDown(btnBw))
+
+        #Order is the same as the arguments of 'StepRC' type
+        return (state_lr, state_fwbw, 0.0, 0.0)
 
     def _updateHUD(self):
         if not self.HUDState['visible']:

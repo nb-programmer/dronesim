@@ -25,6 +25,9 @@ class DronePhysicsEngine:
         #Params of the operation, if any
         params : dict = {}
 
+        #If action is None, above values are returned, the physics engine may interpret
+        #them as desired, such as performing previous action, having no action (halt in place)
+
         if isinstance(action, StepRC):
             #Just RC is given directly
             rcvec = action

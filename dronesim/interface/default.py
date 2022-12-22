@@ -1,6 +1,9 @@
 
 from .control import IDroneControllable
 from ..simulator import DroneSimulator
+from ..types import DroneAction, StepRC, StepActionType
+
+from queue import Queue, Empty
 
 import threading, time
 
@@ -18,6 +21,7 @@ class DefaultDroneControl(IDroneControllable):
         self._update_enable = update_enable
         self._tps_update_period = tps_update_period
         self.__state = dict(tps=0)
+        self.__cmd_queue : Queue[StepActionType] = Queue()
 
         self._th = threading.Thread(target=self.droneTick, daemon=True)
         self._th.start()
@@ -33,9 +37,16 @@ class DefaultDroneControl(IDroneControllable):
         last_ticks, last_tick_check = 0, time.time()
 
         while True:
+            #Get action given
+            cmd = None
+            try:
+                cmd = self.__cmd_queue.get_nowait()
+            except Empty:
+                pass
+
             #Perform step
             if self._update_enable:
-                droneState = self.drone.step()
+                droneState = self.drone.step(cmd)
 
             #Update TPS
             if time.time() - last_tick_check >= self._tps_update_period:
@@ -57,7 +68,24 @@ class DefaultDroneControl(IDroneControllable):
             next_time += (1.0 / self._tick_rate)
             delaySleep = next_time - time.time()
             time.sleep(max(0, delaySleep))
-    
+
     def get_current_state(self):
         return self.__state
 
+    def rc_control(self, vector : StepRC):
+        self.__cmd_queue.put_nowait(vector)
+
+    def takeoff(self):
+        self.__cmd_queue.put_nowait({
+            'action': DroneAction.TAKEOFF
+        })
+
+    def land(self):
+        self.__cmd_queue.put_nowait({
+            'action': DroneAction.LAND
+        })
+
+    def freeze(self):
+        self.__cmd_queue.put_nowait({
+            'action': DroneAction.STOPINPLACE
+        })

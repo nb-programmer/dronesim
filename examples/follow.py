@@ -81,9 +81,9 @@ class AIDroneControlAgent(threading.Thread, IDroneControllable):
 
         #Attach camera to the UAV, point downwards facing the floor
         self.drone.sensors['down_camera_rgb'].reparentTo(app.getUAVModelNode())
-        self.drone.sensors['down_camera_rgb'].setHpr(-90, -90, 0)
+        self.drone.sensors['down_camera_rgb'].setHpr(0, -90, 0)
         self.drone.sensors['down_camera_depth'].reparentTo(app.getUAVModelNode())
-        self.drone.sensors['down_camera_depth'].setHpr(-90, -90, 0)
+        self.drone.sensors['down_camera_depth'].setHpr(0, -90, 0)
 
     def run(self):
         self.drone.state = {"pos": 123}
@@ -91,7 +91,7 @@ class AIDroneControlAgent(threading.Thread, IDroneControllable):
         for _ in range(200):
             state = self.drone.step()
         for _ in range(2000):
-            state = self.drone.step(StepRC(0.7,0,0,0))
+            state = self.drone.step(StepRC(0,0.6,0,0))
             self.__update_debug_state(state)
             time.sleep(0.01)
 
