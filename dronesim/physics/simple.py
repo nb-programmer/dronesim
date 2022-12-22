@@ -15,7 +15,7 @@ class SimpleDronePhysics(DronePhysicsEngine):
     GRAVITY = glm.vec3(0, 0, -1e-3)
     AIR_RESISTANCE = glm.vec3((0.95,)*3)
     #Angle is counter-clockwise from 3 o'clock position, so negate the magnitude to turn properly
-    RC_SCALE = glm.vec4(0.09, 0.09, 0.05, -0.018)
+    RC_SCALE = glm.vec4(0.09, 0.09, 0.09, -0.05)
     
     #PID controller parameters
     STRAFE_CONTROL_PARAM = {'Kp': 0.45, 'Ki': 0.01, 'Kd': 0.0}

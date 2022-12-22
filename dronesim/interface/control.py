@@ -1,6 +1,6 @@
 from abc import ABC
 
-from ..types import StepRC
+from ..types import StepRC, DroneAction
 
 class IDroneControllable(ABC):
     '''
@@ -30,4 +30,6 @@ class IDroneControllable(ABC):
     def rotate_counterclockwise(self, x : float):
         pass
     def freeze(self):
+        pass
+    def directAction(self, action : DroneAction, args : dict = None):
         pass

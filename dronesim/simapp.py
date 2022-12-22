@@ -21,7 +21,7 @@ from direct.task.Task import Task
 from . import PACKAGE_BASE
 from .interface.control import IDroneControllable
 from .utils import IterEnumMixin, HUDMixin, rad2deg
-from .types import Vec4Tuple
+from .types import Vec4Tuple, DroneAction
 
 import os
 import glm
@@ -358,6 +358,8 @@ class SimulatorApplication(ShowBase):
         self.accept("f5", self.eToggleCameraMode)
         self.accept("f6", self.eToggleControlMode)
         self.accept("f11", self.eToggleFullscreen)
+        self.accept("i", self.eHandleDroneCommandSend, [DroneAction.TAKEOFF])
+        self.accept("k", self.eHandleDroneCommandSend, [DroneAction.LAND])
         
         #Tasks
         self.updateEngineTask = self.taskMgr.add(self.updateEngine, "updateEngine")
@@ -464,6 +466,9 @@ class SimulatorApplication(ShowBase):
         if self.camState.control == ControllingCharacter.player and self.movementState is not None:
             self.drone.rc_control(self.movementState)
 
+    def eHandleDroneCommandSend(self, cmd : DroneAction, params : dict = None):
+        self.drone.directAction(cmd, params)
+
     def _getMovementControlState(self) -> Vec4Tuple:
         #Returns whether a button/key is pressed
         isDown : typing.Callable[[ButtonHandle], bool] = self.mouseWatcherNode.isButtonDown
@@ -473,13 +478,21 @@ class SimulatorApplication(ShowBase):
         btnL = KeyboardButton.ascii_key('a')
         btnR = KeyboardButton.ascii_key('d')
 
+        btnLArrow = KeyboardButton.left()
+        btnRArrow = KeyboardButton.right()
+        btnUArrow = KeyboardButton.up()
+        btnDArrow = KeyboardButton.down()
+
         state_lr = (isDown(btnR) - isDown(btnL))
         state_fwbw = (isDown(btnFw) - isDown(btnBw))
+        state_yawlr = (isDown(btnRArrow) - isDown(btnLArrow))
+        state_altud = (isDown(btnUArrow) - isDown(btnDArrow))
 
         #Order is the same as the arguments of 'StepRC' type
-        return (state_lr, state_fwbw, 0.0, 0.0)
+        return (state_lr, state_fwbw, state_altud, state_yawlr)
 
     def _updateHUD(self):
+        #TODO: Any other way to hide OnscreenText?
         if not self.HUDState['visible']:
             self.camHUDText.setText('')
             self.debugHUDText.setText('')

@@ -1,5 +1,5 @@
 
-from .sensor import SensorBase
+from ..sensor import SensorBase
 from panda3d.core import (
     NodePath,
     Camera,
@@ -16,7 +16,7 @@ class Panda3DCameraSensor(NodePath, SensorBase):
     CAMERA_TYPE_RGB = GraphicsOutput.RTPColor
     CAMERA_TYPE_DEPTH = GraphicsOutput.RTPDepth
 
-    def __init__(self, node_name : str, size = (512, 512), camera_type = CAMERA_TYPE_RGB):
+    def __init__(self, node_name : str, size : tuple = (512, 512), camera_type = CAMERA_TYPE_RGB):
         super().__init__(Camera(node_name, PerspectiveLens()))
         self.tex = Texture()
         self.texfbuf = None
@@ -25,6 +25,8 @@ class Panda3DCameraSensor(NodePath, SensorBase):
     def update(self):
         '''Force render scene and return the image as a 'BGR' numpy array'''
         return
+    def getViewportSize(self) -> tuple:
+        return self.fbufsize
     def attachToEnv(self, scene : NodePath, gengine : GraphicsEngine, host_go : GraphicsOutput):
         #TODO: Check if this is even required
         self.node().setScene(scene)

@@ -89,3 +89,10 @@ class DefaultDroneControl(IDroneControllable):
         self.__cmd_queue.put_nowait({
             'action': DroneAction.STOPINPLACE
         })
+
+    def directAction(self, action : DroneAction, args : dict = None):
+        if args is None: args = {}
+        self.__cmd_queue.put_nowait({
+            'action': action,
+            **args
+        })
