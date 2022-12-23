@@ -6,8 +6,6 @@ from dronesim.types import DroneAction, StepRC
 from dronesim.sensor.panda3d.camera import Panda3DCameraSensor
 
 import threading
-import time
-from collections import namedtuple
 
 import cv2
 
@@ -38,17 +36,30 @@ class AIDroneControlAgent(threading.Thread, IDroneControllable):
         self.drone.sensors['down_camera_depth'].setHpr(0, -90, 0)
 
     def run(self):
+        #Set to True to show an OpenCV window of the RGB camera
+        show_camera = False
+
+        #Tell simulator to takeoff
         self.drone.step({'action': DroneAction.TAKEOFF})
+
+        #Skip some frames till takeoff completes (TODO: wait for state change instead)
         for _ in range(200):
             state = self.drone.step()
-        
+
+        #Cycle for 2000 steps
         for _ in range(2000):
             state = self.drone.step(StepRC(0,0.6,0,0))
-            ret, img = self.drone.sensors['down_camera_rgb'].renderAndGetFrameBuffer()
-            if ret:
-                cv2.imshow("Camera frame", img)
             self.__update_debug_state(state)
+
+            if show_camera:
+                ret, img = self.drone.sensors['down_camera_rgb'].renderAndGetFrameBuffer()
+                #Show image only if we got one
+                if ret:
+                    cv2.imshow("Camera frame", img)
+
             cv2.waitKey(10)
+            
+        cv2.destroyAllWindows()
 
     def __update_debug_state(self, state):
         observation, reward, done, info = state
