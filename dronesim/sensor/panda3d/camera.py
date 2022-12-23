@@ -12,6 +12,15 @@ from panda3d.core import (
     FrameBufferProperties
 )
 
+import numpy as np
+
+COMPONENTTYPE_DTYPE_MAP = {
+    Texture.T_unsigned_byte: np.uint8,
+    Texture.T_unsigned_short: np.short,
+    Texture.T_float: np.float32,
+    Texture.T_unsigned_int_24_8: np.int32
+}
+
 class Panda3DCameraSensor(NodePath, SensorBase):
     CAMERA_TYPE_RGB = GraphicsOutput.RTPColor
     CAMERA_TYPE_DEPTH = GraphicsOutput.RTPDepth
@@ -19,14 +28,55 @@ class Panda3DCameraSensor(NodePath, SensorBase):
     def __init__(self, node_name : str, size : tuple = (512, 512), camera_type = CAMERA_TYPE_RGB):
         super().__init__(Camera(node_name, PerspectiveLens()))
         self.tex = Texture()
+        self.__last_frame = np.zeros((1,1,3))
         self.texfbuf = None
         self.fbufsize = size
         self.camera_type = camera_type
     def update(self):
-        '''Force render scene and return the image as a 'BGR' numpy array'''
-        return
+        '''Render into the framebuffer and return the captured image as a numpy array'''
+        self.renderAndGetFrameBuffer()
+        return self.__last_frame
     def getViewportSize(self) -> tuple:
         return self.fbufsize
+    def renderAndGetFrameBuffer(self) -> np.ndarray:
+        '''
+        Read the current texture data as a numpy array similar to OpenCV's Mat image format.
+
+        In order to get the latest frame, you can call `base.graphicsEngine.renderFrame()` before calling this
+        so that the scene gets rendered. This must also be done if you have a headless instance with just the
+        graphicsEngine else no image will form.
+        '''
+        #TODO: Add a parameter for blocking till buffer copy done
+
+        #Make sure the rendered frame has reached into the buffer in system memory
+        is_rendered = self.tex.mightHaveRamImage()
+        if is_rendered:
+            #Get texture data that was loaded into memory
+            fbdata = self.tex.getRamImage()
+
+            #What type of data will be stored in the buffer
+            #This is needed in order to convert it back to a numpy buffer correctly
+            dtype = COMPONENTTYPE_DTYPE_MAP.get(self.tex.component_type, np.uint8)
+
+            fb_array = np.frombuffer(fbdata, dtype)
+            channels = self.tex.getNumComponents()
+            if channels == 1:
+                #Single channel image does not need extra dimension
+                fb_array = np.reshape(fb_array, (
+                    self.tex.getYSize(),
+                    self.tex.getXSize()
+                ))
+            else:
+                fb_array = np.reshape(fb_array, (
+                    self.tex.getYSize(),
+                    self.tex.getXSize(),
+                    self.tex.getNumComponents()
+                ))
+
+            #Update to latest frame. Textures are laid out as if on quadrant I of a cartesian plane
+            #so we need to flip it to get it into pixel coordinates
+            self.__last_frame = np.flipud(fb_array)
+        return is_rendered, self.__last_frame
     def attachToEnv(self, scene : NodePath, gengine : GraphicsEngine, host_go : GraphicsOutput):
         #TODO: Check if this is even required
         self.node().setScene(scene)

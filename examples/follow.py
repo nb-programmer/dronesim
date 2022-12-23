@@ -9,6 +9,8 @@ import threading
 import time
 from collections import namedtuple
 
+import cv2
+
 class AIDroneControlAgent(threading.Thread, IDroneControllable):
     def __init__(self):
         super().__init__(daemon=True)
@@ -36,15 +38,17 @@ class AIDroneControlAgent(threading.Thread, IDroneControllable):
         self.drone.sensors['down_camera_depth'].setHpr(0, -90, 0)
 
     def run(self):
-        self.drone.state = {"pos": 123}
         self.drone.step({'action': DroneAction.TAKEOFF})
-        print(self.drone.sensors['down_camera_rgb'].getViewportSize())
         for _ in range(200):
             state = self.drone.step()
+        
         for _ in range(2000):
             state = self.drone.step(StepRC(0,0.6,0,0))
+            ret, img = self.drone.sensors['down_camera_rgb'].renderAndGetFrameBuffer()
+            if ret:
+                cv2.imshow("Camera frame", img)
             self.__update_debug_state(state)
-            time.sleep(0.01)
+            cv2.waitKey(10)
 
     def __update_debug_state(self, state):
         observation, reward, done, info = state
