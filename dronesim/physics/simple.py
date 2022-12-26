@@ -12,17 +12,23 @@ class SimpleDronePhysics(DronePhysicsEngine):
     Assume units are in centimeters when translating to irl unit
     '''
     
-    GRAVITY = glm.vec3(0, 0, -1e-3)
-    AIR_RESISTANCE = glm.vec3((0.95,)*3)
+    GRAVITY = glm.vec3(0, 0, -2e-1)
+    AIR_RESISTANCE = glm.vec3((0.98,)*3)
     #Angle is counter-clockwise from 3 o'clock position, so negate the magnitude to turn properly
-    RC_SCALE = glm.vec4(0.09, 0.09, 0.09, -0.05)
+    RC_SCALE = glm.vec4(0.2, 0.2, 0.1, -0.05)
+
+    TAKEOFF_COMPLETE_ERROR_MAX = 1e-1
+    ARMED_MIN_THRUST = 1e-3
+    TAKEOFF_COMPLETE_STABLE_TICKS = 30
     
     #PID controller parameters
-    STRAFE_CONTROL_PARAM = {'Kp': 0.45, 'Ki': 0.01, 'Kd': 0.0}
-    LIFT_CONTROL_PARAM = {'Kp': 0.002, 'Ki': 0.002, 'Kd': 0.0}
-    TURN_CONTROL_PARAM = {'Kp': 0.5, 'Ki': 0.0, 'Kd': 0.0}
+    STRAFE_CONTROL_PARAM = {'Kp': 0.02, 'Ki': 0.0, 'Kd': 0.0}
+    LIFT_CONTROL_PARAM = {'Kp': 0.019, 'Ki': 0.012, 'Kd': 0.0}
+    TURN_CONTROL_PARAM = {'Kp': 0.2, 'Ki': 0.0, 'Kd': 0.0}
 
     def reset(self, state : PhysicsStateType = None) -> PhysicsStateType:
+        #TODO: put all of this in a dict-inheriting class and use that as state
+
         #Position of the drone in space
         self.pos = glm.vec3((0,0,0))
         self.angle = glm.vec3((0,0,0))
@@ -30,9 +36,15 @@ class SimpleDronePhysics(DronePhysicsEngine):
         self.pvel = glm.vec4(0,0,0,1)
         self.fvel = glm.vec3()
         self.avel = glm.vec3()
+        self.ticks = 0
+        self._lastRC = None
+        self._tickLogs : dict = {}
 
         #Thrust to apply
         self.thrust_vec = glm.vec3()
+
+        #Landed, stationary
+        self._operation = DroneState.LANDED
 
         #Movement PID control. XY and W is for velocity, Z is for absolute position (altitude)
         self.control = Vec4PID(
@@ -44,9 +56,6 @@ class SimpleDronePhysics(DronePhysicsEngine):
 
         self._state : PhysicsStateType = dict()
         self._updateState()
-
-        #Landed, stationary
-        self._operation = DroneState.LANDED
 
         return self.state
 
@@ -76,14 +85,36 @@ class SimpleDronePhysics(DronePhysicsEngine):
         self.reset(state)
 
     def step(self, action : StepActionType, dt : float = None) -> PhysicsStateType:
+        self.ticks += 1
+
         rcvec, op, params = self.decodeAction(action)
+
+        #State machine
         if op is not None:
             if op == DroneAction.TAKEOFF:
-                self._operation = DroneState.TAKING_OFF
-                self.control.z.setpoint = params.get("altitude", 10.0)
+                if self._operation == DroneState.LANDED:
+                    self._operation = DroneState.TAKING_OFF
+                    self.control.z.setpoint = params.get("altitude", 10.0)
+                    self._tickLogs[DroneState.TAKING_OFF] = 0
 
-        if rcvec is None:
-            rcvec = StepRC(0,0,0,0)
+        if self._operation == DroneState.TAKING_OFF:
+            z_error = self.control.z.setpoint - self.pos.z
+            abs_speed = glm.length(self.pvel.xyz)
+            #print(abs_speed)
+            if abs(z_error) < self.TAKEOFF_COMPLETE_ERROR_MAX:
+                self._tickLogs[DroneState.TAKING_OFF] += 1
+                if self._tickLogs[DroneState.TAKING_OFF] > self.TAKEOFF_COMPLETE_STABLE_TICKS:
+                    self._operation = DroneState.IN_AIR
+
+        #Save last RC for later
+        if rcvec is not None:
+            self._lastRC = (rcvec, self.ticks)
+        #If no RC, reuse previous RC input for some steps
+        else:
+            if self._lastRC is not None and self._lastRC[0] is not None and self.ticks < self._lastRC[1] + 30:
+                rcvec = self._lastRC[0]
+            else:
+                rcvec = StepRC(0,0,0,0)
 
         #Which direction to move using RC
         rc_vec = glm.vec4(rcvec)
@@ -91,18 +122,22 @@ class SimpleDronePhysics(DronePhysicsEngine):
         rc_vec *= self.RC_SCALE
 
         is_on_surface = False
-        is_accept_rc = False
+        is_armed = self._operation != DroneState.LANDED
+        is_accept_rc = self._operation == DroneState.IN_AIR
 
         #RC thrust control
-        self.control.x.setpoint = rc_vec.x  # Target velocity
-        self.control.y.setpoint = rc_vec.y  # Target velocity
-        self.control.w.setpoint = rc_vec.w  # Target heading angle
-        self.control.z.setpoint += rc_vec.z # Absolute height
+        if is_accept_rc:
+            self.control.x.setpoint = rc_vec.x  # Target velocity
+            self.control.y.setpoint = rc_vec.y  # Target velocity
+            self.control.w.setpoint = rc_vec.w  # Target heading angle
+            self.control.z.setpoint += rc_vec.z # Absolute height
+            if self.control.z.setpoint < 0:
+                self.control.z.setpoint = 0.0
 
         #Apply thrust based on target position
         self.thrust_vec.x = self.control.x(self.pvel.x, dt)
         self.thrust_vec.y = self.control.y(self.pvel.y, dt)
-        self.thrust_vec.z = self.control.z(self.pos.z, dt)
+        self.thrust_vec.z = glm.max(self.control.z(self.pos.z, dt), self.ARMED_MIN_THRUST if is_armed else 0.0)
         self.avel.z = self.control.w(self.avel.z, dt)
         
         #3D coordinate transformation matrix

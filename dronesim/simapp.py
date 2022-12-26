@@ -8,7 +8,8 @@ from panda3d.core import (
     KeyboardButton,
     AmbientLight,
     LPoint3f, LVecBase3f, LPoint4f,
-    NodePath, TextNode
+    NodePath, TextNode,
+    ClockObject
 )
 
 import simplepbr
@@ -20,8 +21,9 @@ from direct.task.Task import Task
 
 from . import PACKAGE_BASE
 from .interface.control import IDroneControllable
-from .utils import IterEnumMixin, HUDMixin, rad2deg
+from .utils import IterEnumMixin, HUDMixin
 from .types import Vec4Tuple, DroneAction
+from .utils import asarray, rad2deg, deg2rad, clamp, modulo, sin, cos
 
 import os
 import glm
@@ -65,6 +67,12 @@ def objectHUDFormatter(o):
     return str(o)
 
 class CameraControlBase:
+    def __init__(self, clock : ClockObject = None):
+        if clock is None:
+            clock = ClockObject()
+        self._clock = clock
+        self._lastTickTime = clock.real_time
+
     def assertMode(self, app : ShowBase, mouseLocked : bool = None):
         self._app = app
         #Ignore an update so that mouse centering doesn't shift the view
@@ -81,7 +89,10 @@ class CameraControlBase:
             self._mouseModeRelative()
         else:
             self._mouseModeUnlocked()
-            
+
+    def updateScroll(self, dir : float):
+        pass
+
     def update(self, dt : float = None, **kwargs):
         '''Default camera update handler'''
         if self.mouseLocked:
@@ -93,6 +104,19 @@ class CameraControlBase:
             'pos': self._app.camera.getPos(),
             'facing': self._app.camera.getHpr()
         }
+
+    @staticmethod
+    def restrictHpr(hprVec, p_range : typing.Tuple[float, float] = (-90,90), r_range : typing.Tuple[float, float] = (-90,90)):
+        h, p, r = hprVec
+        h = modulo(h, 360)
+        p, r = clamp((p, r), [p_range[0], r_range[0]], [p_range[1], r_range[1]])
+        return asarray([h, p, r])
+
+    def _getTickDiffTime(self):
+        currTickTime = self._clock.real_time
+        tickPeriod = currTickTime - self._lastTickTime
+        self._lastTickTime = currTickTime
+        return tickPeriod
 
     def _grabMouseLockRelative(self):
         '''
@@ -124,15 +148,32 @@ class CameraControlBase:
         self._app.win.requestProperties(props)
 
 class FreeCam(CameraControlBase):
+    '''
+    Implement Free camera (spectator view) movement
+    '''
+    def __init__(self, flySpeed : float = 15.0, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._flySpeed = flySpeed
+
+    def state(self):
+        return {
+            **super().state(),
+            'flySpeed': self._flySpeed
+        }
+
+    def updateScroll(self, dir : float):
+        #Inspired by Blender view3d fly
+        time_wheel = self._getTickDiffTime()
+        time_wheel = 1 + (10 - (20 * min(time_wheel, 0.5)))
+        self._flySpeed += dir * time_wheel * 0.25
+        self._flySpeed = min(max(self._flySpeed, 2.0), 100.0)
+
     def update(self,
                dt : float,
-               flySpeed : float = 30.0,
                lookSensitivity : float = 2000.0,
                mvVec : Vec4Tuple = None,
                **kwargs):
-        '''
-        Implement Free camera (spectator view) movement
-        '''
+
         hprVec = self._app.camera.getHpr()
         xyzVec = self._app.camera.getPos()
 
@@ -145,6 +186,7 @@ class FreeCam(CameraControlBase):
             hprVec[0] -= mx * lookSensitivity * dt
             hprVec[1] -= my * lookSensitivity * dt
 
+        hprVec = tuple(self.restrictHpr(hprVec))
         self._app.camera.setHpr(hprVec)
 
         #Get updated camera matrix
@@ -155,18 +197,105 @@ class FreeCam(CameraControlBase):
 
         #New camera position based on user control and camera facing direction.
         #This allows movement in any direction
-        flyVec = camRotVecLR * mvVec[0] * flySpeed * dt + camRotVecFB * mvVec[1] * flySpeed * dt
+        flyVec = camRotVecLR * mvVec[0] * self._flySpeed * dt + camRotVecFB * mvVec[1] * self._flySpeed * dt
         self._app.camera.setPos(xyzVec + flyVec)
+
+class FPCamera(CameraControlBase):
+    '''
+    Implements a first-person view camera.
+
+    It will kind of feel like riding a boat in Minecraft
+    '''
+
+    def assertMode(self, app : ShowBase, *args, **kwargs):
+        super().assertMode(app, *args, **kwargs)
+        self._followObj : Actor = app.getUAVModelNode()
+
+    def update(self,
+               dt : float,
+               lookSensitivity : float = 2000.0,
+               **kwargs):
+        hprVec = self._app.camera.getHpr()
+
+        if self.mouseLocked:
+            mx, my = self._grabMouseLockRelative()
+            #Mouse relative pitch and yaw
+            hprVec[0] -= mx * lookSensitivity * dt
+            hprVec[1] -= my * lookSensitivity * dt
+
+        hprVec = tuple(self.restrictHpr(hprVec))
+        self._app.camera.setHpr(hprVec)
+        self._app.camera.setPos(self._followObj.getPos())
+
+
+class TPCamera(CameraControlBase):
+    '''
+    Implements a third-person view camera.
+    '''
+
+    def __init__(self, orbit_radius : float = 30.0, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._orbit_radius = orbit_radius
+        self._cam_hprVec = asarray([0,0,0], dtype=float)
+
+    def state(self):
+        return {
+            **super().state(),
+            'orbitRadius': self._orbit_radius
+        }
+
+    def updateScroll(self, dir : float):
+        #Inspired by Blender view3d fly
+        time_wheel = self._getTickDiffTime()
+        time_wheel = 1 + (10 - (20 * min(time_wheel, 0.5)))
+        self._orbit_radius += dir * time_wheel * 0.25
+        self._orbit_radius = min(max(self._orbit_radius, 5.0), 50.0)
+
+    def assertMode(self, app : ShowBase, *args, **kwargs):
+        super().assertMode(app, *args, **kwargs)
+        self._followObj : Actor = app.getUAVModelNode()
+
+    def update(self,
+               dt : float,
+               lookSensitivity : float = 2000.0,
+               **kwargs):
+
+        if self.mouseLocked:
+            mx, my = self._grabMouseLockRelative()
+            #Mouse relative pitch and yaw
+            self._cam_hprVec[0] += mx * lookSensitivity * dt
+            self._cam_hprVec[1] += my * lookSensitivity * dt
+
+        #Limit pitch not exactly to +/-90 degree so that lookAt does not flip image when it is exactly 90
+        self._cam_hprVec = self.restrictHpr(self._cam_hprVec, p_range=(-89.999,89.999))
+
+        _target_pos = self._followObj.getPos()
+        heading_rads = deg2rad(self._cam_hprVec[0])
+        pitch_rads = deg2rad(self._cam_hprVec[1])
+        pitch_cos = cos(pitch_rads)
+
+        #Orbit control
+        _cam_orbit_xyz = (
+            _target_pos[0] + sin(heading_rads) * pitch_cos * self._orbit_radius,
+            _target_pos[1] + cos(heading_rads) * pitch_cos * self._orbit_radius,
+            _target_pos[2] + sin(pitch_rads) * self._orbit_radius
+        )
+
+        self._app.camera.setPos(_cam_orbit_xyz)
+        self._app.camera.lookAt(self._followObj)
+
 
 class CameraMode(IterEnumMixin, enum.Enum):
     free = FreeCam()
-    firstPerson = CameraControlBase()
-    thirdPerson = CameraControlBase()
+    firstPerson = FPCamera()
+    thirdPerson = TPCamera()
     
     def __call__(self, app, *args, **kwargs):
         self.value.assertMode(app, *args, **kwargs)
     def update(self, dt : float, **kwargs):
         self.value.update(dt, **kwargs)
+    def updateScroll(self, dir : float):
+        self.value.updateScroll(dir)
 
     @property
     def state(self):
@@ -183,14 +312,7 @@ class ControllingCharacter(IterEnumMixin, enum.Enum):
 class CameraController(HUDMixin):
     camMode : CameraMode = CameraMode.free
     mouseCapture : bool = True
-    flySpeed : float = 15.0
     control : ControllingCharacter = ControllingCharacter.camera
-
-    #HUD field visibility
-    def __shouldshow__(self, field : str):
-        if field == 'flySpeed' or field == 'control':
-            return self.camMode == CameraMode.free
-        return True
 
     def __init__(self, *, app=None, **kwargs):
         self.app = app
@@ -206,9 +328,11 @@ class CameraController(HUDMixin):
     def update(self, dt, **kwargs):
         self.camMode.update(
             dt = dt,
-            flySpeed = self.flySpeed,
             **kwargs
         )
+
+    def updateScroll(self, dir : float):
+        self.camMode.updateScroll(dir)
 
 class UAVDroneModel(Actor):
     '''
@@ -289,7 +413,8 @@ class UAVDroneModel(Actor):
         if state is None and self._update_source is not None:
             state = self._update_source.get_current_state()
         if state is not None:
-            transformState = state.get('state')
+            state_info = state[3]
+            transformState = state_info.get('state')
             if transformState is not None:
                 self.setPos(*transformState['pos'])
                 rotx, roty, rotz = transformState['angle']
@@ -424,10 +549,8 @@ class SimulatorApplication(ShowBase):
         self.camState()
 
     def eMouseWheelScroll(self, dir):
-        '''Mouse scroll wheel event handler to change Fly speed'''
-        #Adjust fly speed based on direction of scroll
-        self.camState.flySpeed += dir * 0.25
-        self.camState.flySpeed = min(max(self.camState.flySpeed, 5.0), 50.0)
+        '''Mouse scroll wheel event handler to change camera property (fly speed, orbit size)'''
+        self.camState.updateScroll(dir)
 
     def eToggleDebugView(self):
         '''Keybind event handler to show/hide debug view'''
@@ -467,7 +590,7 @@ class SimulatorApplication(ShowBase):
             self.drone.rc_control(self.movementState)
 
     def eHandleDroneCommandSend(self, cmd : DroneAction, params : dict = None):
-        self.drone.directAction(cmd, params)
+        self.drone.direct_action(cmd, params)
 
     def _getMovementControlState(self) -> Vec4Tuple:
         #Returns whether a button/key is pressed
@@ -499,10 +622,12 @@ class SimulatorApplication(ShowBase):
             return
         
         self.camHUDText.setText(self.formatDictToHUD(self.camState.hud(), serializer=objectHUDFormatter))
-        
+
+        drone_debug_data = self.drone.get_debug_data()
+
         self.debuggerState['items'].update({
             'fps': globalClock.getAverageFrameRate(),
-            'drone': self.droneState,
+            'drone': drone_debug_data,
             'camera': self.camState.camMode.state
         })
         dbgInfo, dbgVis = self.debuggerState['items'], self.debuggerState['visible']

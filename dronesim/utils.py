@@ -2,8 +2,12 @@
 import dataclasses
 import numpy as np
 
+asarray = np.array
 rad2deg = np.rad2deg
 deg2rad = np.deg2rad
+clamp = np.clip
+modulo = np.mod
+sin, cos = np.sin, np.cos
 
 class IterEnumMixin:
     '''Helps to get next item in the enum using next()'''

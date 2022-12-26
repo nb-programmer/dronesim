@@ -31,5 +31,7 @@ class IDroneControllable(ABC):
         pass
     def freeze(self):
         pass
-    def directAction(self, action : DroneAction, args : dict = None):
+    def direct_action(self, action : DroneAction, args : dict = None):
         pass
+    def get_debug_data(self) -> dict:
+        return {}

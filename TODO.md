@@ -5,6 +5,7 @@ Pretty long at the moment
 
 - [x] Complete movement swap (camera to player)
   - [x] Implement UAV movement by user
+- [ ] Show skybox texture
 - [ ] Support for Ardupilot SITL interface
   - [ ] Using Mavlink
   - [ ] Using integrated SITL as optional dependency

@@ -20,7 +20,9 @@ class DefaultDroneControl(IDroneControllable):
         self._tick_rate = tick_rate
         self._update_enable = update_enable
         self._tps_update_period = tps_update_period
-        self.__state = dict(tps=0)
+
+        self.__debug_data = dict(tps=0)
+        self.__state = None
         self.__cmd_queue : Queue[StepActionType] = Queue()
 
         self._th = threading.Thread(target=self.droneTick, daemon=True)
@@ -46,18 +48,18 @@ class DefaultDroneControl(IDroneControllable):
 
             #Perform step
             if self._update_enable:
-                droneState = self.drone.step(cmd)
+                self.__state = self.drone.step(cmd)
 
             #Update TPS
             if time.time() - last_tick_check >= self._tps_update_period:
                 tickDiff = (self.drone.metrics['ticks'] - last_ticks) / self._tps_update_period
                 last_ticks = self.drone.metrics['ticks']
-                self.__state['tps'] = int(tickDiff)
+                self.__debug_data['tps'] = int(tickDiff)
                 last_tick_check = time.time()
                 
-            #Update state info from the simulation step
-            observation, reward, done, info = droneState
-            self.__state.update({
+            #Update debug state info from the simulation step
+            observation, reward, done, info = self.__state
+            self.__debug_data.update({
                 'state': info['state'],
                 'observation': observation,
                 'reward': reward,
@@ -71,6 +73,9 @@ class DefaultDroneControl(IDroneControllable):
 
     def get_current_state(self):
         return self.__state
+
+    def get_debug_data(self) -> dict:
+        return self.__debug_data
 
     def rc_control(self, vector : StepRC):
         self.__cmd_queue.put_nowait(vector)
@@ -90,7 +95,7 @@ class DefaultDroneControl(IDroneControllable):
             'action': DroneAction.STOPINPLACE
         })
 
-    def directAction(self, action : DroneAction, args : dict = None):
+    def direct_action(self, action : DroneAction, args : dict = None):
         if args is None: args = {}
         self.__cmd_queue.put_nowait({
             'action': action,

@@ -23,7 +23,8 @@ class AIDroneControlAgent(threading.Thread, IDroneControllable):
             down_camera_depth = Panda3DCameraSensor("downCameraDepth", size=(160,160), camera_type=Panda3DCameraSensor.CAMERA_TYPE_DEPTH)
         )
 
-        self.__state = dict()
+        self.__state = None
+        self.__debug_data = dict()
 
     def initEnv(self, app):
         self.drone.sensors['down_camera_rgb'].attachToEnv(app.render, app.graphicsEngine, app.win)
@@ -44,12 +45,12 @@ class AIDroneControlAgent(threading.Thread, IDroneControllable):
 
         #Skip some frames till takeoff completes (TODO: wait for state change instead)
         for _ in range(200):
-            state = self.drone.step()
+            self.__state = self.drone.step()
 
         #Cycle for 2000 steps
         for _ in range(2000):
-            state = self.drone.step(StepRC(0,0.6,0,0))
-            self.__update_debug_state(state)
+            self.__state = self.drone.step(StepRC(0,0.6,0,0))
+            self.__update_debug_state(self.__state)
 
             if show_camera:
                 ret, img = self.drone.sensors['down_camera_rgb'].renderAndGetFrameBuffer()
@@ -63,7 +64,7 @@ class AIDroneControlAgent(threading.Thread, IDroneControllable):
 
     def __update_debug_state(self, state):
         observation, reward, done, info = state
-        self.__state.update({
+        self.__debug_data.update({
             'simulator': info['metrics'],
             'generation': 0,
             'iteration': 0,
@@ -77,6 +78,9 @@ class AIDroneControlAgent(threading.Thread, IDroneControllable):
 
     def get_current_state(self):
         return self.__state
+
+    def get_debug_data(self) -> dict:
+        return self.__debug_data
 
 def main():
     droneControl = AIDroneControlAgent()
