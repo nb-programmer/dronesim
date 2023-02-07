@@ -46,7 +46,7 @@ class IDroneControllable(ABC):
         '''Strafe back direction (-ve Y axis relative to UAV angle) with velocity `x` (between 0.0 - 1.0)'''
         pass
     def move_up(self, x : float, blocking=True, timeout=None):
-        '''Increase altitude (+ve Z axis) with velocity `x` (between 0.0 - 1.0). Stops if hightst flight altitude is achieved'''
+        '''Increase altitude (+ve Z axis) with velocity `x` (between 0.0 - 1.0). Stops if highest flight altitude is achieved'''
         pass
     def move_down(self, x : float, blocking=True, timeout=None):
         '''Decrease altitude (-ve Z axis) with velocity `x` (between 0.0 - 1.0). Stops if lowest flight altitude is achieved'''
