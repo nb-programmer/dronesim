@@ -1,52 +1,87 @@
 
 from .control import IDroneControllable
 from ..simulator import DroneSimulator
-from ..types import DroneAction, StepRC, StepActionType
+from ..types import DroneAction, DroneState, StepRC, StepActionType
 
 from queue import Queue, Empty
+from contextlib import suppress
 
 import threading, time
 
-class DefaultDroneControl(IDroneControllable):
+#Extends Thread, implements IDroneControllable
+class DefaultDroneControl(threading.Thread, IDroneControllable):
     '''
-    Allows the drone to be controlled by the user with no automatic control
+    Allows the simulator to be controlled by the user using high-level functions in real time.
+
+    This interface is thread-safe.
     '''
     def __init__(self,
                  drone : DroneSimulator,
                  tick_rate : float = 100,
-                 update_enable : bool = False,
-                 tps_update_period = 1):
+                 auto_start : bool = True,
+                 update_enable : bool = True,
+                 tps_update_period : float = 1,
+                 wait_till_started : bool = True):
+        super().__init__(daemon=True, target=self._droneTickLoop)
         self.drone = drone
         self._tick_rate = tick_rate
+        if self._tick_rate <= 0:
+            self._tick_rate = 100
         self._update_enable = update_enable
         self._tps_update_period = tps_update_period
+        if self._tps_update_period <= 0:
+            self._tps_update_period = 1.0
 
         self.__debug_data = dict(tps=0)
+        #Store last state
         self.__state = None
+        #FIFO to process commands called using the interface methods
         self.__cmd_queue : Queue[StepActionType] = Queue()
 
-        self._th = threading.Thread(target=self.droneTick, daemon=True)
-        self._th.start()
-        
-    def enableUpdate(self):
+        self._ev_started = threading.Event()
+        self._predicate = threading.Condition()
+
+        if auto_start:
+            self.start()
+        if wait_till_started:
+            self.wait_for_start()
+
+    def wait_for_start(self, timeout=None):
+        self._ev_started.wait(timeout)
+
+    def wait_till_done(self):
+        '''Block till all actions from the command queue are performed'''
+        self.__cmd_queue.join()
+
+    def enable_update(self):
         self._update_enable = True
-        
-    def disableUpdate(self):
+
+    def disable_update(self):
         self._update_enable = False
 
-    def droneTick(self):
+
+    def _initEventHandlers(self):
+        def _notifyOperationChange(state):
+            with self._predicate:
+                self._predicate.notify_all()
+        self.drone.physics.on('operation', _notifyOperationChange)
+
+    def _droneTickLoop(self):
         next_time = time.time()
         last_ticks, last_tick_check = 0, time.time()
+
+        self._initEventHandlers()
+
+        self._ev_started.set()
 
         while True:
             #Get action given
             cmd = None
-            try:
+            with suppress(Empty):
                 cmd = self.__cmd_queue.get_nowait()
-            except Empty:
-                pass
+                self.__cmd_queue.task_done()
 
-            #Perform step
+            #Perform step, even if no commands are available
             if self._update_enable:
                 self.__state = self.drone.step(cmd)
 
@@ -58,18 +93,22 @@ class DefaultDroneControl(IDroneControllable):
                 last_tick_check = time.time()
                 
             #Update debug state info from the simulation step
-            observation, reward, done, info = self.__state
-            self.__debug_data.update({
-                'state': info['state'],
-                'observation': observation,
-                'reward': reward,
-                'sensors': len(self.drone.sensors)
-            })
-            
+            if self.__state is not None:
+                observation, reward, done, info = self.__state
+                self.__debug_data.update({
+                    'state': self.drone.debug_data,
+                    'observation': observation,
+                    'reward': reward,
+                    'sensors': len(self.drone.sensors)
+                })
+
             #Wait for next step (keeping constant rate)
             next_time += (1.0 / self._tick_rate)
-            delaySleep = next_time - time.time()
-            time.sleep(max(0, delaySleep))
+            delaySleep = max(0, next_time - time.time())
+            time.sleep(delaySleep)
+
+
+    #Implement interface functions
 
     def get_current_state(self):
         return self.__state
@@ -80,24 +119,37 @@ class DefaultDroneControl(IDroneControllable):
     def rc_control(self, vector : StepRC):
         self.__cmd_queue.put_nowait(vector)
 
-    def takeoff(self):
+    def takeoff(self, blocking=True, timeout=None):
         self.__cmd_queue.put_nowait({
             'action': DroneAction.TAKEOFF
         })
+        if blocking:
+            with self._predicate:
+                #TODO: simulator will alert if takeoff failed, raise exception here
+                def _wait_takeoff():
+                    return self.drone.state.get('operation') == DroneState.IN_AIR
+                self._predicate.wait_for(_wait_takeoff, timeout)
 
-    def land(self):
+    def land(self, blocking=True, timeout=None):
         self.__cmd_queue.put_nowait({
             'action': DroneAction.LAND
         })
+        if blocking:
+            with self._predicate:
+                #TODO: simulator will alert if landing failed, raise exception here
+                def _wait_land():
+                    return self.drone.state.get('operation') == DroneState.LANDED
+                self._predicate.wait_for(_wait_land, timeout)
 
-    def freeze(self):
+    def freeze(self, blocking=True, timeout=None):
         self.__cmd_queue.put_nowait({
-            'action': DroneAction.STOPINPLACE
+            'action': DroneAction.STOP_IN_PLACE
         })
 
-    def direct_action(self, action : DroneAction, args : dict = None):
-        if args is None: args = {}
+
+
+    def direct_action(self, action : DroneAction, **params):
         self.__cmd_queue.put_nowait({
             'action': action,
-            **args
+            **params
         })

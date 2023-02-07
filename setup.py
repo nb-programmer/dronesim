@@ -9,17 +9,18 @@ URL = 'https://github.com/nb-programmer/dronesim'
 EMAIL = 'narayanband1356@gmail.com'
 AUTHOR = 'nb-programmer'
 REQUIRES_PYTHON = '>=3.7.0'
-VERSION = '0.4.0'
+VERSION = '0.5.0'
 LICENSE = 'MIT'
 
 REQUIRED = [
-    'Panda3D',              #The 3D game engine that does all the heavy lifting of rendering
-    'panda3d-gltf',         #Model export format support for gltf/glb models
-    'panda3d-simplepbr',    #Physically Based Rendering (PBR) model support (Blender-exported models)
-    'numpy',                #Number manipulation and some math functions
-    'PyGLM',                #Matrix and vector math
-    'simple-pid',           #PID controller for physics engines
-    'matplotlib'            #To plot target vs actual to tune PID coefficients
+    'Panda3D',              # The 3D game engine that does all the heavy lifting of rendering
+    'panda3d-gltf',         # Model export format support for gltf/glb models
+    'panda3d-simplepbr',    # Physically Based Rendering (PBR) model support (Blender-exported models)
+    'pyee',                 # Event interface for state change in the simulator
+    'numpy',                # Number manipulation and some math functions
+    'PyGLM',                # Matrix and vector math
+    'simple-pid',           # PID controller for physics engines
+    'matplotlib'            # To plot target vs actual to tune PID coefficients
 ]
 
 EXTRAS = {

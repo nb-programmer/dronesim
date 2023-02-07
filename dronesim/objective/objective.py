@@ -1,12 +1,12 @@
 
 class ObjectiveBase:
-    def setApp(self, app : 'DroneSimulator'):
+    def set_app(self, app : 'DroneSimulator'):
         self.app = app
-    def getObservation(self):
+    def get_observation(self):
         return
-    def getFitness(self) -> float:
+    def get_fitness(self) -> float:
         return
-    def getIsDone(self) -> bool:
+    def get_is_done(self) -> bool:
         return False
     def update(self):
         pass

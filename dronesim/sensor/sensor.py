@@ -1,4 +1,4 @@
 
 class SensorBase:
-    def attachTo(self, sim : 'DroneSimulator'):
+    def attach_to(self, sim : 'DroneSimulator'):
         pass

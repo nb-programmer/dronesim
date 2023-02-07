@@ -5,19 +5,27 @@ from simple_pid import PID
 
 from ..types import DroneState, StepActionType, DroneAction, StepRC
 
+import pyee
+
 #4-dimension PID control
 Vec4PID = typing.NamedTuple('VEC4DOFPID', x=PID, y=PID, z=PID, w=PID)
 PhysicsStateType = typing.Dict[str, typing.Any]
 
-class DronePhysicsEngine:
+class DronePhysicsEngine(pyee.EventEmitter):
+    '''
+    Physics engine base class (abstract class) used to implement UAV physics engines for simulation.
+
+    Note that pyee's EventEmitter is used as the event manager. If you want to make use a different method
+    to handle events, such as using asyncio's coroutines, you can `uplift` method (pyee.uplift.uplift) to convert
+    the simulator class to the desired emitter type.
+    '''
     def __init__(self):
-        #Current operation: Landed state
-        self._operation : DroneState = DroneState.LANDED
+        super().__init__()
         #No state data yet. Will only be set after a reset
         self._state = None
         
     @staticmethod
-    def decodeAction(action : StepActionType):
+    def decode_action(action : StepActionType):
         #We want to use StepRC for the movement
         rcvec = None
         #Operation to perform actions (takeoff, land, tricks, etc)
@@ -43,7 +51,7 @@ class DronePhysicsEngine:
         return rcvec, op, params
 
     @property
-    def operation(self): return self._operation
+    def operation(self): return DroneState.LANDED
     @property
     def state(self): return self._state
     @state.setter
@@ -54,4 +62,6 @@ class DronePhysicsEngine:
         return self._state
     def step(self, action : StepActionType, dt : float = None) -> typing.Any:
         raise NotImplementedError()
+    def get_debug_data(self) -> dict:
+        return {}
 

@@ -3,33 +3,32 @@ from panda3d.core import (
     loadPrcFileData,
     getModelPath,
     Filename,
-    WindowProperties,
     ButtonHandle,
     KeyboardButton,
     AmbientLight,
     LPoint3f, LVecBase3f, LPoint4f,
-    NodePath, TextNode,
-    ClockObject
+    NodePath, TextNode
 )
 
-import simplepbr
-
 from direct.showbase.ShowBase import ShowBase
-from direct.actor.Actor import Actor
+from direct.gui.DirectGui import DirectWaitBar, DirectFrame
+from direct.gui.OnscreenImage import OnscreenImage
 from direct.gui.OnscreenText import OnscreenText
+from direct.actor.Actor import Actor
 from direct.task.Task import Task
 
 from . import PACKAGE_BASE
 from .interface.control import IDroneControllable
 from .utils import IterEnumMixin, HUDMixin
 from .types import Vec4Tuple, DroneAction
-from .utils import asarray, rad2deg, deg2rad, clamp, modulo, sin, cos
+
+from .cameracontrol import FreeCam, FPCamera, TPCamera
+from .actor.uav import UAVDroneModel
 
 import os
 import glm
 import enum
 import typing
-import random
 import logging
 from dataclasses import dataclass
 
@@ -54,6 +53,7 @@ HUD_COLORS = dict(
 LOG = logging.getLogger(__name__)
 
 def objectHUDFormatter(o):
+    '''Simple JSON string formatter for various data types'''
     if isinstance(o, enum.Enum):
         return o.name
     if isinstance(o, float):
@@ -66,241 +66,24 @@ def objectHUDFormatter(o):
         return '[hpr] %.2f %.2f %.2f' % tuple(o)
     return str(o)
 
-class CameraControlBase:
-    def __init__(self, clock : ClockObject = None):
-        if clock is None:
-            clock = ClockObject()
-        self._clock = clock
-        self._lastTickTime = clock.real_time
-
-    def assertMode(self, app : ShowBase, mouseLocked : bool = None):
-        self._app = app
-        #Ignore an update so that mouse centering doesn't shift the view
-        self._skip_update = 1
-
-        if mouseLocked is None:
-            if not hasattr(self, 'mouseLocked'):
-                self.mouseLocked = False
-        else:
-            self.mouseLocked = mouseLocked
-
-        #Update mouse lock mode
-        if self.mouseLocked:
-            self._mouseModeRelative()
-        else:
-            self._mouseModeUnlocked()
-
-    def updateScroll(self, dir : float):
-        pass
-
-    def update(self, dt : float = None, **kwargs):
-        '''Default camera update handler'''
-        if self.mouseLocked:
-            #Lock mouse to center if it is being captured
-            self._grabMouseLockRelative()
-    
-    def state(self):
-        return {
-            'pos': self._app.camera.getPos(),
-            'facing': self._app.camera.getHpr()
-        }
-
-    @staticmethod
-    def restrictHpr(hprVec, p_range : typing.Tuple[float, float] = (-90,90), r_range : typing.Tuple[float, float] = (-90,90)):
-        h, p, r = hprVec
-        h = modulo(h, 360)
-        p, r = clamp((p, r), [p_range[0], r_range[0]], [p_range[1], r_range[1]])
-        return asarray([h, p, r])
-
-    def _getTickDiffTime(self):
-        currTickTime = self._clock.real_time
-        tickPeriod = currTickTime - self._lastTickTime
-        self._lastTickTime = currTickTime
-        return tickPeriod
-
-    def _grabMouseLockRelative(self):
-        '''
-        Returns relative motion of mouse by locking it in the center of the window.
-        Returns X and Y relative movement.
-        '''
-        win = self._app.win
-        md = win.getPointer(0)
-        x = md.getX()
-        y = md.getY()
-        cx, cy = win.getXSize()//2, win.getYSize()//2
-        heading, pitch = 0, 0
-        if win.movePointer(0, cx, cy):
-            heading = (x - cx) / cx
-            pitch = (y - cy) / cy
-        if self._skip_update > 0:
-            self._skip_update -= 1
-            return (0, 0)
-        return (heading, pitch)
-    def _mouseModeRelative(self):
-        props = WindowProperties()
-        props.setCursorHidden(True)
-        props.setMouseMode(WindowProperties.M_relative)
-        self._app.win.requestProperties(props)
-    def _mouseModeUnlocked(self):
-        props = WindowProperties()
-        props.setCursorHidden(False)
-        props.setMouseMode(WindowProperties.M_absolute)
-        self._app.win.requestProperties(props)
-
-class FreeCam(CameraControlBase):
-    '''
-    Implement Free camera (spectator view) movement
-    '''
-    def __init__(self, flySpeed : float = 15.0, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._flySpeed = flySpeed
-
-    def state(self):
-        return {
-            **super().state(),
-            'flySpeed': self._flySpeed
-        }
-
-    def updateScroll(self, dir : float):
-        #Inspired by Blender view3d fly
-        time_wheel = self._getTickDiffTime()
-        time_wheel = 1 + (10 - (20 * min(time_wheel, 0.5)))
-        self._flySpeed += dir * time_wheel * 0.25
-        self._flySpeed = min(max(self._flySpeed, 2.0), 100.0)
-
-    def update(self,
-               dt : float,
-               lookSensitivity : float = 2000.0,
-               mvVec : Vec4Tuple = None,
-               **kwargs):
-
-        hprVec = self._app.camera.getHpr()
-        xyzVec = self._app.camera.getPos()
-
-        if mvVec is None:
-            mvVec = (0,)*4
-
-        if self.mouseLocked:
-            mx, my = self._grabMouseLockRelative()
-            #Mouse relative pitch and yaw
-            hprVec[0] -= mx * lookSensitivity * dt
-            hprVec[1] -= my * lookSensitivity * dt
-
-        hprVec = tuple(self.restrictHpr(hprVec))
-        self._app.camera.setHpr(hprVec)
-
-        #Get updated camera matrix
-        camRotVecFB = self._app.camera.getMat().getRow3(1)
-        camRotVecLR = self._app.camera.getMat().getRow3(0)
-        camRotVecFB.normalize()
-        camRotVecLR.normalize()
-
-        #New camera position based on user control and camera facing direction.
-        #This allows movement in any direction
-        flyVec = camRotVecLR * mvVec[0] * self._flySpeed * dt + camRotVecFB * mvVec[1] * self._flySpeed * dt
-        self._app.camera.setPos(xyzVec + flyVec)
-
-class FPCamera(CameraControlBase):
-    '''
-    Implements a first-person view camera.
-
-    It will kind of feel like riding a boat in Minecraft
-    '''
-
-    def assertMode(self, app : ShowBase, *args, **kwargs):
-        super().assertMode(app, *args, **kwargs)
-        self._followObj : Actor = app.getUAVModelNode()
-
-    def update(self,
-               dt : float,
-               lookSensitivity : float = 2000.0,
-               **kwargs):
-        hprVec = self._app.camera.getHpr()
-
-        if self.mouseLocked:
-            mx, my = self._grabMouseLockRelative()
-            #Mouse relative pitch and yaw
-            hprVec[0] -= mx * lookSensitivity * dt
-            hprVec[1] -= my * lookSensitivity * dt
-
-        hprVec = tuple(self.restrictHpr(hprVec))
-        self._app.camera.setHpr(hprVec)
-        self._app.camera.setPos(self._followObj.getPos())
-
-
-class TPCamera(CameraControlBase):
-    '''
-    Implements a third-person view camera.
-    '''
-
-    def __init__(self, orbit_radius : float = 30.0, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._orbit_radius = orbit_radius
-        self._cam_hprVec = asarray([0,0,0], dtype=float)
-
-    def state(self):
-        return {
-            **super().state(),
-            'orbitRadius': self._orbit_radius
-        }
-
-    def updateScroll(self, dir : float):
-        #Inspired by Blender view3d fly
-        time_wheel = self._getTickDiffTime()
-        time_wheel = 1 + (10 - (20 * min(time_wheel, 0.5)))
-        self._orbit_radius += dir * time_wheel * 0.25
-        self._orbit_radius = min(max(self._orbit_radius, 5.0), 50.0)
-
-    def assertMode(self, app : ShowBase, *args, **kwargs):
-        super().assertMode(app, *args, **kwargs)
-        self._followObj : Actor = app.getUAVModelNode()
-
-    def update(self,
-               dt : float,
-               lookSensitivity : float = 2000.0,
-               **kwargs):
-
-        if self.mouseLocked:
-            mx, my = self._grabMouseLockRelative()
-            #Mouse relative pitch and yaw
-            self._cam_hprVec[0] += mx * lookSensitivity * dt
-            self._cam_hprVec[1] += my * lookSensitivity * dt
-
-        #Limit pitch not exactly to +/-90 degree so that lookAt does not flip image when it is exactly 90
-        self._cam_hprVec = self.restrictHpr(self._cam_hprVec, p_range=(-89.999,89.999))
-
-        _target_pos = self._followObj.getPos()
-        heading_rads = deg2rad(self._cam_hprVec[0])
-        pitch_rads = deg2rad(self._cam_hprVec[1])
-        pitch_cos = cos(pitch_rads)
-
-        #Orbit control
-        _cam_orbit_xyz = (
-            _target_pos[0] + sin(heading_rads) * pitch_cos * self._orbit_radius,
-            _target_pos[1] + cos(heading_rads) * pitch_cos * self._orbit_radius,
-            _target_pos[2] + sin(pitch_rads) * self._orbit_radius
-        )
-
-        self._app.camera.setPos(_cam_orbit_xyz)
-        self._app.camera.lookAt(self._followObj)
-
 
 class CameraMode(IterEnumMixin, enum.Enum):
+    '''Cyclic iterable enum to get active camera'''
+
     free = FreeCam()
     firstPerson = FPCamera()
     thirdPerson = TPCamera()
-    
+
     def __call__(self, app, *args, **kwargs):
-        self.value.assertMode(app, *args, **kwargs)
+        self.value.assert_mode(app, *args, **kwargs)
     def update(self, dt : float, **kwargs):
         self.value.update(dt, **kwargs)
-    def updateScroll(self, dir : float):
-        self.value.updateScroll(dir)
+    def update_scroll(self, dir : float):
+        self.value.update_scroll(dir)
 
     @property
     def state(self):
         return self.value.state()
-
 
 class ControllingCharacter(IterEnumMixin, enum.Enum):
     '''Whether the user controls the camera or the UAV'''
@@ -331,202 +114,132 @@ class CameraController(HUDMixin):
             **kwargs
         )
 
-    def updateScroll(self, dir : float):
-        self.camMode.updateScroll(dir)
+    def update_scroll(self, dir : float):
+        self.camMode.update_scroll(dir)
 
-class UAVDroneModel(Actor):
-    '''
-    Model class for a UAV Drone (quad, hex)-copter with separate Shell and propeller models.
-    The model object can be synced to a state object via a IDroneControllable interface object.
-
-    :param IDroneControllable update_source: Optional drone interface to update position/rotation with every update() call.
-    If not specified, you can pass the state in the update(state).
-
-    :param dict propellers indicates the set of bones to use in the model to attach propellers.
-    the key is the name of the bone, and value is the model asset file name or NodePath object.
-    The number of propellers would indicate the type of drone it is.
-
-    :param dict propeller_spin indicates direction of spin for the given propeller bones, where value of
-    '1' is clockwise, and '-1' is anti-clockwise. Direction is set to clockwise to any bones with unspecified direction.
-    
-    
-    Default propeller layout is the 'Quad X' frame arrangement
-    
-    '''
-    def __init__(self,
-                 update_source : IDroneControllable = None,
-                 shell_model : typing.Union[NodePath, os.PathLike] = None,
-                 propellers : typing.Dict[str, typing.Union[NodePath, os.PathLike]] = None,
-                 propeller_spin : typing.Dict[str, float] = None):
-        self._update_source = update_source
-        if shell_model is None:
-            shell_model = "assets/models/quad-shell.glb"
-        
-        #Default propeller models
-        if propellers is None:
-            prop_model_cw = "assets/models/propeller.glb"
-            prop_model_ccw = prop_model_cw #Temporary
-
-            propellers = {
-                "PropellerJoint1": prop_model_ccw,
-                "PropellerJoint2": prop_model_ccw,
-                "PropellerJoint3": prop_model_cw,
-                "PropellerJoint4": prop_model_cw
-            }
-            if propeller_spin is None:
-                propeller_spin = {
-                    "PropellerJoint1": -1,
-                    "PropellerJoint2": -1,
-                    "PropellerJoint3": 1,
-                    "PropellerJoint4": 1
-                }
-        
-        if propeller_spin is None:
-            propeller_spin = dict()
-            
-        propeller_spin.update({k: 1 for k in propellers.keys() if k not in propeller_spin})
-
-        #Prefix so that it doesn't clash with original bone node
-        propeller_parts = {'p_%s'%k:v for k,v in propellers.items()}
-        
-        self.joints = {'propellers': {}}
-
-        super().__init__({
-            'modelRoot': shell_model,
-            **propeller_parts
-        }, anims={'modelRoot': {}}) #To use the multipart w/o LOD loader (this is the way to do it)
-        
-        for bone in propellers.keys():
-            #Make node accessible
-            self.exposeJoint(None, 'modelRoot', bone)
-            self.attach('p_%s'%bone, "modelRoot", bone)
-            control_node = self.controlJoint(None, 'modelRoot', bone)
-
-            self.joints['propellers'][bone] = {
-                'bone': control_node,
-                'spinDir': propeller_spin[bone]
-            }
-            #Random rotation
-            control_node.setH(random.randint(0,360))
-    
-    def update(self, state : dict = None):
-        if state is None and self._update_source is not None:
-            state = self._update_source.get_current_state()
-        if state is not None:
-            state_info = state[3]
-            transformState = state_info.get('state')
-            if transformState is not None:
-                self.setPos(*transformState['pos'])
-                rotx, roty, rotz = transformState['angle']
-                self.setHpr(rad2deg(rotz), rad2deg(roty), rad2deg(rotx)) #TODO: Need more transformations for pitch and roll
-                thrust = transformState['thrust']
-                prop_vel = thrust.z * 1e5
-
-                for bone in self.joints['propellers'].values():
-                    #Rotate with respect to spin direction and thrust
-                    bone['bone'].setH(bone['bone'].getH() + prop_vel*bone['spinDir'])
-
-        super().update()
-        
 class SimulatorApplication(ShowBase):
     '''
+    Simulator app to render and control the UAV environment.
+    It handles creating the simulator window, loading the scene, camera control,
+    handling actors and user input.
     '''
+
+    DEFAULT_SCENE = "assets/scenes/simple_loop.glb"
+
     def __init__(self,
-                 drone : IDroneControllable,
+                 *uav_players : UAVDroneModel,
                  scene_path : os.PathLike = None,
                  use_simplepbr_renderer : bool = True,
-                 drone_model : Actor = None,
                  **kwargs
         ):
         super().__init__(**kwargs)
         base.disableMouse() # Disable default mouse control
 
-        self.drone : IDroneControllable = drone
-        
+        self._all_uavs : typing.List[UAVDroneModel] = list(uav_players)
+
         if use_simplepbr_renderer:
+            #TODO: Test import, if fail, fallback to auto shader. Once done, make simplepbr optional.
+            import simplepbr
             simplepbr.init(enable_shadows=False)
         else:
             self.render.setShaderAuto()
 
         #Scene
-        self.scene = self._loadScene(scene_path)
+        self.scene = self._load_scene(scene_path)
 
-        #Drone object
-        if drone_model is None:
-            drone_model = UAVDroneModel()
+        #Reparent all UAVs to the scene
+        for uav in uav_players:
+            uav.reparentTo(self.render)
 
-        self.droneModel = drone_model
-        self.droneModel.reparentTo(self.render)
-        
         #Add ambient lighting (minimum scene light)
         ambient = self.render.attachNewNode(AmbientLight('ambientDullLight'))
         ambient.node().setColor((.1, .1, .1, 1))
         self.render.setLight(ambient)
-        
+
         #State
         self.camState = CameraController(app=self)
         self.camera.setPos(0, -10, 10)
         self.camLens.setNear(0.1)
-        self.droneState = None
-        self.debuggerState = dict(visible=False, items={})
-        self.HUDState = dict(visible=True)
+        self.debuggerState = dict()
+        self.HUDState = dict()
         self.movementState : Vec4Tuple = None
-        
+
         self.accept("v", self.bufferViewer.toggleEnable)
         self.accept("V", self.bufferViewer.toggleEnable)
-        
+
         #Events
         self.accept("escape", self.eToggleMouseCapture)
         self.accept("wheel_up", self.eMouseWheelScroll, [1])
         self.accept("wheel_down", self.eMouseWheelScroll, [-1])
+        self.accept("f1", self.eToggleHUDView)
         self.accept("f3", self.eToggleDebugView)
         self.accept("f5", self.eToggleCameraMode)
         self.accept("f6", self.eToggleControlMode)
         self.accept("f11", self.eToggleFullscreen)
-        self.accept("i", self.eHandleDroneCommandSend, [DroneAction.TAKEOFF])
-        self.accept("k", self.eHandleDroneCommandSend, [DroneAction.LAND])
-        
+        self.accept("\\", self.eHandleUAVStateDump)
+
+        self.accept("i", self.eHandleUAVCommandSend, [DroneAction.TAKEOFF])
+        self.accept("k", self.eHandleUAVCommandSend, [DroneAction.LAND])
+
         #Tasks
-        self.updateEngineTask = self.taskMgr.add(self.updateEngine, "updateEngine")
-        
+        self.updateEngineTask = self.taskMgr.add(self.update_engine, "updateEngine")
+
         #HUD elements
-        self.camHUDText = OnscreenText(
-            parent = self.a2dTopRight,
+        HUD_PADDING = 0.08
+        self.HUD_holder = DirectFrame(
+            frameSize = (self.a2dLeft, self.a2dRight, self.a2dBottom, self.a2dTop),
+            frameColor = (0, 0, 0, 0)
+        )
+
+        self.HUD_basic_info = OnscreenText(
+            parent = self.HUD_holder,
             scale = 0.06,
             align = TextNode.ARight,
-            pos = (-0.03, -0.1),
+            pos = (self.a2dRight - HUD_PADDING/self.a2dRight/2, self.a2dTop - HUD_PADDING),
+            mayChange = True,
             **HUD_COLORS
         )
-        self.debugHUDText = OnscreenText(
-            parent = self.a2dTopLeft,
+
+        self.HUD_debug_info = OnscreenText(
+            parent = self.HUD_holder,
             scale = 0.06,
             align = TextNode.ALeft,
-            pos = (0.03, -0.1),
+            pos = (self.a2dLeft - HUD_PADDING/self.a2dLeft/2, self.a2dTop - HUD_PADDING),
+            mayChange = True,
             **HUD_COLORS
         )
-        
-    def getUAVModelNode(self) -> Actor:
-        return self.droneModel
+        self.HUD_debug_info.hide()
 
-    def updateEngine(self, task : Task):
+    @property
+    def activeUAVNode(self) -> UAVDroneModel:
+        if len(self._all_uavs) > 0:
+            return self._all_uavs[0]
+
+    @property
+    def activeUAVController(self) -> IDroneControllable:
+        uav = self.activeUAVNode
+        if uav:
+            return uav.controller
+
+    def update_engine(self, task : Task):
         '''Update all objects in the app'''
         self.movementState = self._getMovementControlState()
         self._updatePlayerMovementCommand()
-        self._updateDroneObject()
+        self._updateUAVObjects()
         self._updateCamera()
         self._updateHUD()
         return task.cont
 
-    def loadScene(self, scene_path : os.PathLike):
-        self.scene = self._loadScene(scene_path)
-        
-    def _loadScene(self, scene_path : os.PathLike) -> NodePath:
+    def load_scene(self, scene_path : os.PathLike):
+        self.scene = self._load_scene(scene_path)
+
+    def _load_scene(self, scene_path : os.PathLike) -> NodePath:
         if scene_path is None:
-            scene_path = "assets/scenes/simple_loop.glb"
+            scene_path = self.DEFAULT_SCENE
         sceneModel = self.loader.loadModel(scene_path)
         sceneModel.setPos(0,0,0)
         sceneModel.reparentTo(self.render)
-        
+
         #Move scene lighting to root (render) node
         #So that all objects are affected by it
         sceneModel.clear_light()
@@ -535,13 +248,13 @@ class SimulatorApplication(ShowBase):
             self.render.setLight(light)
 
         return sceneModel
-        
+
     def eToggleCameraMode(self):
         '''Keybind event handler to switch Camera Mode'''
         self.camState.camMode = next(self.camState.camMode)
         LOG.info("Changed cam to %s" % self.camState.camMode.name)
         self.camState()
-        
+
     def eToggleMouseCapture(self):
         '''Keybind event handler to enable/disable Mouse capture'''
         self.camState.mouseCapture = not self.camState.mouseCapture
@@ -550,11 +263,21 @@ class SimulatorApplication(ShowBase):
 
     def eMouseWheelScroll(self, dir):
         '''Mouse scroll wheel event handler to change camera property (fly speed, orbit size)'''
-        self.camState.updateScroll(dir)
+        self.camState.update_scroll(dir)
+
+    def eToggleHUDView(self):
+        '''Keybind event handler to show/hide the HUD'''
+        if self.HUD_holder.isHidden():
+            self.HUD_holder.show()
+        else:
+            self.HUD_holder.hide()
 
     def eToggleDebugView(self):
         '''Keybind event handler to show/hide debug view'''
-        self.debuggerState['visible'] = not self.debuggerState['visible']
+        if self.HUD_debug_info.isHidden():
+            self.HUD_debug_info.show()
+        else:
+            self.HUD_debug_info.hide()
 
     def eToggleControlMode(self):
         self.camState.control = next(self.camState.control)
@@ -577,20 +300,28 @@ class SimulatorApplication(ShowBase):
         base.win.requestProperties(new_wp)
         '''
 
-    def _updateDroneObject(self):
-        self.droneState = self.drone.get_current_state()
-        self.droneModel.update(self.droneState)
+    def eHandleUAVStateDump(self):
+        '''Dump the current state object to stdout'''
+        print(self.activeUAVController.get_current_state(), flush=True)
+
+    def eHandleUAVCommandSend(self, cmd : DroneAction, **params):
+        '''Send the given command (with parameters) to the active UAV controller'''
+        player = self.activeUAVController
+        if player:
+            player.direct_action(cmd, **params)
+
+    def _updateUAVObjects(self):
+        for uav in self._all_uavs:
+            uav.update()
 
     def _updateCamera(self):
         control = self.movementState if self.camState.control == ControllingCharacter.camera else None
         self.camState.update(globalClock.dt, mvVec=control)
 
     def _updatePlayerMovementCommand(self):
-        if self.camState.control == ControllingCharacter.player and self.movementState is not None:
-            self.drone.rc_control(self.movementState)
-
-    def eHandleDroneCommandSend(self, cmd : DroneAction, params : dict = None):
-        self.drone.direct_action(cmd, params)
+        player = self.activeUAVController
+        if self.movementState is not None and player and self.camState.control == ControllingCharacter.player:
+            player.rc_control(self.movementState)
 
     def _getMovementControlState(self) -> Vec4Tuple:
         #Returns whether a button/key is pressed
@@ -615,25 +346,18 @@ class SimulatorApplication(ShowBase):
         return (state_lr, state_fwbw, state_altud, state_yawlr)
 
     def _updateHUD(self):
-        #TODO: Any other way to hide OnscreenText?
-        if not self.HUDState['visible']:
-            self.camHUDText.setText('')
-            self.debugHUDText.setText('')
-            return
-        
-        self.camHUDText.setText(self.formatDictToHUD(self.camState.hud(), serializer=objectHUDFormatter))
+        self.HUD_basic_info.setText(self.formatDictToHUD(self.camState.hud(), serializer=objectHUDFormatter))
 
-        drone_debug_data = self.drone.get_debug_data()
+        uav = self.activeUAVController
+        uav_debug_data = uav.get_debug_data() if uav else {}
 
-        self.debuggerState['items'].update({
+        self.debuggerState.update({
             'fps': globalClock.getAverageFrameRate(),
-            'drone': drone_debug_data,
+            'uav': uav_debug_data,
             'camera': self.camState.camMode.state
         })
-        dbgInfo, dbgVis = self.debuggerState['items'], self.debuggerState['visible']
-        self.debugHUDText.setText(
-            self.formatDictToHUD(dbgInfo, serializer=objectHUDFormatter)
-            if dbgVis else ''
+        self.HUD_debug_info.setText(
+            self.formatDictToHUD(self.debuggerState, serializer=objectHUDFormatter)
         )
 
     @staticmethod

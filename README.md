@@ -6,6 +6,9 @@ makes it easy to use it for various A.I. applications such as path following, ob
 It comes with a bunch of sensors that can be attached to the UAV, such as a Camera (RGB and Depth), IMU (motion), and more to come.
 The simulator can have an "objective" set to generate observations for machine learning applications.
 
+## Features
+TODO
+
 ## Installation
 
 Install the package using pip from :
@@ -43,12 +46,15 @@ The default mouse control is set to `Free mode` with mouse for looking.
 Key|Action
 ---|---
 Esc|Unlock/Lock and Show/Hide mouse
-F3|Show debug data
-F5|Change camera mode from one of three [Free, First Person and Third Person]
-F6|Toggle control between camera and UAV
+F1|Toggle visibility of HUD
+F3|Toggle visibility of debug view
+F5|Change camera mode from one of [Free, First Person or Third Person]
+F6|Toggle your control between camera and UAV
 F11|Toggle fullscreen
+v|Show/hide all buffers
+`\`|Dump current simulator state to console
 
-### Default drone controls
+### Default drone/camera controls
 
 Use the keyboard to control the drone or camera, with the following binds:
 
@@ -64,3 +70,4 @@ Up arrow|Increase altitude
 Down arrow|Decrease altitude
 Left arrow|Heading counter-clockwise
 Right arrow|Heading clockwise
+Mouse wheel|Free cam: change fly speed

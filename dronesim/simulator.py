@@ -21,8 +21,8 @@ class DroneSimulator:
         self.__sensors : typing.Dict[str, SensorBase] = {}
         self.__sensor_state = {}
         
-        self.setDefaultResetState(default_reset_state)
-        self.setObjective(objective)
+        self.set_default_reset_state(default_reset_state)
+        self.set_objective(objective)
 
         #Physics engine default
         if self.__physics is None:
@@ -30,22 +30,22 @@ class DroneSimulator:
         
         #Sensor attachment
         if default_sensors:
-            self.addSensor(ekf0 = IMUSensor())
+            self.add_sensor(ekf0 = IMUSensor())
 
-        self.addSensor(**additional_sensors)
+        self.add_sensor(**additional_sensors)
 
         self.__metrics = {}
 
         self.reset()
         
-    def addSensor(self, **sensor : SensorBase):
+    def add_sensor(self, **sensor : SensorBase):
         #TODO: Maybe add some checks
         self.__sensors.update(**sensor)
         if len(sensor) > 0:
-            self.updateSensorAttachmentToSelf(sensor.keys())
+            self.update_sensor_attachment_to_self(sensor.keys())
         return self
 
-    def updateSensorAttachmentToSelf(self, sensors : typing.List[str] = None):
+    def update_sensor_attachment_to_self(self, sensors : typing.List[str] = None):
         '''(Re-)attach all sensors added to the simulator by calling their 'attachTo' method'''
         if sensors is None:
             sensors = self.__sensors.keys()
@@ -54,7 +54,7 @@ class DroneSimulator:
             if s not in self.__sensors:
                 #TODO: Log warning
                 continue
-            self.__sensors.get(s).attachTo(self)
+            self.__sensors.get(s).attach_to(self)
             
     def step(self, action : StepActionType = None) -> StateType:
         '''
@@ -63,9 +63,9 @@ class DroneSimulator:
         self.__physics.step(action)
         self.__metrics['ticks'] += 1
 
-        return self.getState()
+        return self.get_state()
 
-    def getState(self) -> StateType:
+    def get_state(self) -> StateType:
         '''
         Get the current state of the drone simulator from the objective and physics engine, according to the Gym specifications:
             (observation, reward, done, info)
@@ -80,7 +80,7 @@ class DroneSimulator:
         '''
         obs, fitness, done = None, None, False
         if self.__objective is not None:
-            obs, fitness, done = self.__objective.getObservation(), self.__objective.getFitness(), self.__objective.getIsDone()
+            obs, fitness, done = self.__objective.get_observation(), self.__objective.get_fitness(), self.__objective.get_is_done()
         return (obs, fitness, done, {'state': self.state, 'metrics': self.metrics, 'sensors': self.__sensor_state})
 
     def reset(self, state = None):
@@ -90,22 +90,22 @@ class DroneSimulator:
             state = self.__default_reset_state
 
         self.__physics.reset(state)
-        self._updateSensors()
-        self._resetMetrics()
+        self._update_sensors()
+        self._reset_metrics()
 
-        return self.getState()
+        return self.get_state()
 
-    def setDefaultResetState(self, state):
+    def set_default_reset_state(self, state):
         self.__default_reset_state = state
 
-    def setObjective(self, objective : ObjectiveBase):
+    def set_objective(self, objective : ObjectiveBase):
         self.__objective = objective
 
-    def _updateSensors(self):
+    def _update_sensors(self):
         #TODO: Left to implement
         self.__sensor_state = {sensor_name : None for sensor_name, sensor in self.__sensors.items()}
 
-    def _resetMetrics(self):
+    def _reset_metrics(self):
         '''Reset default metric values'''
         self.__metrics.update({
             'ticks': 0
@@ -136,6 +136,9 @@ class DroneSimulator:
     def state(self, state):
         self.__physics.state = state
 
+    @property
+    def debug_data(self):
+        return self.__physics.get_debug_data()
 
 #Optional Gym environment
 
@@ -146,6 +149,7 @@ except ImportError:
     class Env: pass
 
 #TODO: Still more left to implement: Env state
+#TODO: In fact, gym is now abandoned, and Gymnasium is the new replacement. So we need to use that instead
 
 class DroneSimulatorGym(DroneSimulator, Env):
     metadata = {"render_modes": ["rgb_array"]}

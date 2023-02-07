@@ -14,6 +14,7 @@ from panda3d.core import (
 
 import numpy as np
 
+#Maps Panda3D's data type enum to numpy's data types for use in conversion
 COMPONENTTYPE_DTYPE_MAP = {
     Texture.T_unsigned_byte: np.uint8,
     Texture.T_unsigned_short: np.short,
@@ -34,11 +35,11 @@ class Panda3DCameraSensor(NodePath, SensorBase):
         self.camera_type = camera_type
     def update(self):
         '''Render into the framebuffer and return the captured image as a numpy array'''
-        self.renderAndGetFrameBuffer()
+        self.render_and_get_framebuffer()
         return self.__last_frame
-    def getViewportSize(self) -> tuple:
+    def get_viewport_size(self) -> tuple:
         return self.fbufsize
-    def renderAndGetFrameBuffer(self) -> np.ndarray:
+    def render_and_get_framebuffer(self) -> np.ndarray:
         '''
         Read the current texture data as a numpy array similar to OpenCV's Mat image format.
 
@@ -77,7 +78,7 @@ class Panda3DCameraSensor(NodePath, SensorBase):
             #so we need to flip it to get it into pixel coordinates
             self.__last_frame = np.flipud(fb_array)
         return is_rendered, self.__last_frame
-    def attachToEnv(self, scene : NodePath, gengine : GraphicsEngine, host_go : GraphicsOutput):
+    def attach_to_env(self, scene : NodePath, gengine : GraphicsEngine, host_go : GraphicsOutput):
         #TODO: Check if this is even required
         self.node().setScene(scene)
         self.reparentTo(scene)

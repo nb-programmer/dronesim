@@ -10,7 +10,7 @@ class AerialEffects:
         self.rand_acc_z = 0.0
         self.rand_acc_a = 0.0
 
-    def applyShakeEffect(self, velvec : np.ndarray , max_noise_magnitude : float = 1e-1, factors : np.ndarray = None, influence_value : float = 0.0):
+    def apply_shake_effect(self, velvec : np.ndarray , max_noise_magnitude : float = 1e-1, factors : np.ndarray = None, influence_value : float = 0.0):
         #Random shaking Brownian motion
         noise_magnitude = np.random.uniform(0, max_noise_magnitude) * np.clip(influence_value * 1e-1, 0.5, 1.5)
         self.rand_acc_xy += np.random.uniform(0, 2*np.pi)
