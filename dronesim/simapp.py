@@ -1,13 +1,17 @@
 
 from panda3d.core import (
     loadPrcFileData,
-    getModelPath,
+
+    VirtualFileSystem,
+    VirtualFileMountSystem,
     Filename,
+    getModelPath,
     ButtonHandle,
     KeyboardButton,
     AmbientLight,
     LPoint3f, LVecBase3f, LPoint4f,
-    NodePath, TextNode
+    NodePath, TextNode, Texture, SamplerState,
+    TransparencyAttrib
 )
 
 from direct.showbase.ShowBase import ShowBase
@@ -42,9 +46,20 @@ texture-anisotropic-degree 16
 """
 loadPrcFileData("", DEFAULT_CONFIG_VARS)
 
-#Add package directory to load assets
-getModelPath().appendDirectory(Filename.from_os_specific(PACKAGE_BASE))
+#Instruct the Virtual File System to mount the real 'assets/' folder to the virtual directory '/assets/'
+ASSETS = VirtualFileSystem.getGlobalPtr()
+ASSETS.mount(
+    VirtualFileMountSystem(Filename.from_os_specific(
+        os.path.join(PACKAGE_BASE, 'assets/')
+    )),
+    '/assets/',
+    VirtualFileSystem.MFReadOnly
+)
 
+#Add virtual assets directory to load models and scenes from to the Loader's search path
+getModelPath().appendDirectory('/assets')
+
+#Colors used for some HUD elements as foreground (text color) and background
 HUD_COLORS = dict(
     fg=(1,1,1,1),
     bg=(0,0,0,0.2)
@@ -69,6 +84,8 @@ def objectHUDFormatter(o):
 
 class CameraMode(IterEnumMixin, enum.Enum):
     '''Cyclic iterable enum to get active camera'''
+
+    #All cameras listed here will be cycled through by the user
 
     free = FreeCam()
     firstPerson = FPCamera()
@@ -102,6 +119,8 @@ class CameraController(HUDMixin):
         #Activate current (default) mode
         self()
 
+    # Mostly just passthrough methods
+
     def __call__(self):
         self.camMode(
             self.app,
@@ -124,7 +143,8 @@ class SimulatorApplication(ShowBase):
     handling actors and user input.
     '''
 
-    DEFAULT_SCENE = "assets/scenes/simple_loop.glb"
+    #Default scene to load (from virtual assets directory that is mounted. Can be anywhere, really)
+    DEFAULT_SCENE = Filename("scenes/simple_loop.glb")
 
     def __init__(self,
                  *uav_players : UAVDroneModel,
@@ -138,7 +158,7 @@ class SimulatorApplication(ShowBase):
         self._all_uavs : typing.List[UAVDroneModel] = list(uav_players)
 
         if use_simplepbr_renderer:
-            #TODO: Test import, if fail, fallback to auto shader. Once done, make simplepbr optional.
+            #TODO: Test import, if fail, fallback to auto shader. Once done, make panda3d-simplepbr optional.
             import simplepbr
             simplepbr.init(enable_shadows=False)
         else:
@@ -164,10 +184,11 @@ class SimulatorApplication(ShowBase):
         self.HUDState = dict()
         self.movementState : Vec4Tuple = None
 
+        #Buffer viewer keybind
         self.accept("v", self.bufferViewer.toggleEnable)
         self.accept("V", self.bufferViewer.toggleEnable)
 
-        #Events
+        #Keybinds for various operations
         self.accept("escape", self.eToggleMouseCapture)
         self.accept("wheel_up", self.eMouseWheelScroll, [1])
         self.accept("wheel_down", self.eMouseWheelScroll, [-1])
@@ -178,6 +199,7 @@ class SimulatorApplication(ShowBase):
         self.accept("f11", self.eToggleFullscreen)
         self.accept("\\", self.eHandleUAVStateDump)
 
+        #UAV action keybinds
         self.accept("i", self.eHandleUAVCommandSend, [DroneAction.TAKEOFF])
         self.accept("k", self.eHandleUAVCommandSend, [DroneAction.LAND])
 
@@ -185,6 +207,7 @@ class SimulatorApplication(ShowBase):
         self.updateEngineTask = self.taskMgr.add(self.update_engine, "updateEngine")
 
         #HUD elements
+        #TODO: Make a HUD class and put stuff in there and control it using methods
         HUD_PADDING = 0.08
         self.HUD_holder = DirectFrame(
             frameSize = (self.a2dLeft, self.a2dRight, self.a2dBottom, self.a2dTop),
@@ -208,15 +231,31 @@ class SimulatorApplication(ShowBase):
             mayChange = True,
             **HUD_COLORS
         )
+        #Hide debug view by default
         self.HUD_debug_info.hide()
 
+        #Crosshair
+        crosshair_tex = self.loader.loadTexture(
+            Filename("crosshair.png"),
+            minfilter = SamplerState.FTNearest,
+            magfilter = SamplerState.FTNearest
+        )
+        self.HUD_crosshair = OnscreenImage(
+            parent = self.HUD_holder,
+            image = crosshair_tex,
+            pos = (0,0,0),
+            scale = (0.12, 1, 0.12)
+        )
+        self.HUD_crosshair.setTransparency(TransparencyAttrib.MAlpha)
+        self.HUD_crosshair.setColor((1,1,1,0.33))
+
     @property
-    def activeUAVNode(self) -> UAVDroneModel:
+    def activeUAVNode(self) -> typing.Optional[UAVDroneModel]:
         if len(self._all_uavs) > 0:
             return self._all_uavs[0]
 
     @property
-    def activeUAVController(self) -> IDroneControllable:
+    def activeUAVController(self) -> typing.Optional[IDroneControllable]:
         uav = self.activeUAVNode
         if uav:
             return uav.controller
@@ -230,10 +269,10 @@ class SimulatorApplication(ShowBase):
         self._updateHUD()
         return task.cont
 
-    def load_scene(self, scene_path : os.PathLike):
+    def load_scene(self, scene_path : typing.Union[os.PathLike, Filename]):
         self.scene = self._load_scene(scene_path)
 
-    def _load_scene(self, scene_path : os.PathLike) -> NodePath:
+    def _load_scene(self, scene_path : typing.Union[os.PathLike, Filename]) -> NodePath:
         if scene_path is None:
             scene_path = self.DEFAULT_SCENE
         sceneModel = self.loader.loadModel(scene_path)

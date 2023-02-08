@@ -1,6 +1,7 @@
 from abc import ABC
 
 from ..types import StepRC, DroneAction
+from typing import Any
 
 class IDroneControllable(ABC):
     '''
@@ -14,7 +15,7 @@ class IDroneControllable(ABC):
     def rc_control(self, vector : StepRC):
         '''Send direct RC control command with 3D movement velocity and yaw velocity control'''
         pass
-    def get_current_state(self):
+    def get_current_state(self) -> Any:
         '''Returns the instantaneous state object. Type and format depends on the interface used'''
         pass
     def get_debug_data(self) -> dict:

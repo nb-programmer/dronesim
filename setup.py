@@ -9,7 +9,7 @@ URL = 'https://github.com/nb-programmer/dronesim'
 EMAIL = 'narayanband1356@gmail.com'
 AUTHOR = 'nb-programmer'
 REQUIRES_PYTHON = '>=3.7.0'
-VERSION = '0.5.0'
+VERSION = '0.5.2'
 LICENSE = 'MIT'
 
 REQUIRED = [
@@ -29,7 +29,13 @@ EXTRAS = {
 }
 
 PACKAGE_DATA = {
-    NAME: ['assets/**', 'assets/models/**', 'assets/scenes/**']     #Models and scenes
+    #Include models, scenes and textures with the package when installing
+    NAME: [
+        'assets/**',
+        'assets/models/**',
+        'assets/scenes/**',
+        'assets/textures/**'
+    ]
 }
 
 PACKAGE_ENTRY_SCRIPTS = [ 'dronesim = dronesim.__main__:main' ]

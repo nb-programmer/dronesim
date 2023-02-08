@@ -23,6 +23,6 @@ Pretty long at the moment. It is in no particular order
 - [ ] Implement sensor interface
 - [ ] Physics engine using Panda3D's bullet physics engine
 - [ ] Implement IMU and other sensors
-- [ ] Show crosshair
+- [x] Show crosshair
 - [ ] Allow sensor access to physics engine
 - [ ] Bump mapping on scene to make depth more realistic

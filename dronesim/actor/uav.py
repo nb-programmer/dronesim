@@ -1,6 +1,6 @@
 
 from direct.actor.Actor import Actor
-from panda3d.core import NodePath
+from panda3d.core import NodePath, Filename
 
 from dronesim.interface.control import IDroneControllable
 from dronesim.utils import rad2deg
@@ -31,18 +31,18 @@ class UAVDroneModel(Actor):
     '''
     def __init__(self,
                  control_source : IDroneControllable,
-                 shell_model : typing.Union[NodePath, os.PathLike] = None,
-                 propellers : typing.Dict[str, typing.Union[NodePath, os.PathLike]] = None,
+                 shell_model : typing.Union[NodePath, os.PathLike, Filename] = None,
+                 propellers : typing.Dict[str, typing.Union[NodePath, os.PathLike, Filename]] = None,
                  propeller_spin : typing.Dict[str, float] = None):
         self._control_source = control_source
 
         if shell_model is None:
-            shell_model = "assets/models/quad-shell.glb"
+            shell_model = Filename("models/quad-shell.glb")
         
         #Default propeller models
         if propellers is None:
-            prop_model_cw = "assets/models/propeller.glb"
-            prop_model_ccw = prop_model_cw #Temporary
+            prop_model_cw = Filename("models/propeller.glb")
+            prop_model_ccw = prop_model_cw #TODO: Temporary, create a filpped model
 
             propellers = {
                 "PropellerJoint1": prop_model_ccw,
