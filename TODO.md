@@ -24,5 +24,6 @@ Pretty long at the moment. It is in no particular order
 - [ ] Physics engine using Panda3D's bullet physics engine
 - [ ] Implement IMU and other sensors
 - [x] Show crosshair
+  - [ ] Crosshair blend mode (invert) with what's on screen below it
 - [ ] Allow sensor access to physics engine
 - [ ] Bump mapping on scene to make depth more realistic

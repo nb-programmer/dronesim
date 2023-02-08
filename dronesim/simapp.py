@@ -1,7 +1,6 @@
 
 from panda3d.core import (
     loadPrcFileData,
-
     VirtualFileSystem,
     VirtualFileMountSystem,
     Filename,
@@ -10,12 +9,12 @@ from panda3d.core import (
     KeyboardButton,
     AmbientLight,
     LPoint3f, LVecBase3f, LPoint4f,
-    NodePath, TextNode, Texture, SamplerState,
+    NodePath, TextNode, SamplerState,
     TransparencyAttrib
 )
 
 from direct.showbase.ShowBase import ShowBase
-from direct.gui.DirectGui import DirectWaitBar, DirectFrame
+from direct.gui.DirectGui import DirectFrame
 from direct.gui.OnscreenImage import OnscreenImage
 from direct.gui.OnscreenText import OnscreenText
 from direct.actor.Actor import Actor

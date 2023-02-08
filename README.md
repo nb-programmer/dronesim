@@ -70,4 +70,4 @@ Up arrow|Increase altitude
 Down arrow|Decrease altitude
 Left arrow|Heading counter-clockwise
 Right arrow|Heading clockwise
-Mouse wheel|Free cam: change fly speed
+Mouse wheel|Free cam: change fly speed; Third Person cam: Change orbit radius

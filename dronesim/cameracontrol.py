@@ -11,6 +11,11 @@ from .types import Vec4Tuple
 import typing
 
 class CameraControlBase:
+    '''
+    Base class for camera control
+    This class on its own does not do anything with the camera, but it implements some useful
+    utility functions
+    '''
     def __init__(self, clock : ClockObject = None):
         if clock is None:
             clock = ClockObject()
