@@ -236,7 +236,7 @@ class SimulatorApplication(ShowBase):
 
         #Crosshair
         crosshair_tex = self.loader.loadTexture(
-            Filename("crosshair.png"),
+            Filename("textures/crosshair.png"),
             minfilter = SamplerState.FTNearest,
             magfilter = SamplerState.FTNearest
         )
