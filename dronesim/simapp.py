@@ -7,6 +7,7 @@ from panda3d.core import (
     getModelPath,
     ButtonHandle,
     KeyboardButton,
+    Light,
     AmbientLight,
     LPoint3f, LVecBase3f, LPoint4f,
     NodePath, TextNode, SamplerState,
@@ -145,35 +146,41 @@ class SimulatorApplication(ShowBase):
     #Default scene to load (from virtual assets directory that is mounted. Can be anywhere, really)
     DEFAULT_SCENE = Filename("scenes/simple_loop.glb")
 
-    def __init__(self,
-                 *uav_players : UAVDroneModel,
-                 scene_path : os.PathLike = None,
-                 use_simplepbr_renderer : bool = True,
-                 **kwargs
+    def __init__(
+            self,
+            *uav_players : UAVDroneModel,
+            scene_model : typing.Optional[typing.Union[str, os.PathLike, Filename, NodePath]] = DEFAULT_SCENE,
+            default_lights : typing.List[Light] = [],
+            **kwargs
         ):
         super().__init__(**kwargs)
-        base.disableMouse() # Disable default mouse control
+        self.disableMouse() # Disable default mouse control
+        self.render.setShaderAuto()
+
+        #TODO: Test import, if fail, fallback to auto shader. Once done, make panda3d-simplepbr optional.
+        import simplepbr
+        simplepbr.init(enable_shadows=False)
 
         self._all_uavs : typing.List[UAVDroneModel] = list(uav_players)
 
-        if use_simplepbr_renderer:
-            #TODO: Test import, if fail, fallback to auto shader. Once done, make panda3d-simplepbr optional.
-            import simplepbr
-            simplepbr.init(enable_shadows=False)
-        else:
-            self.render.setShaderAuto()
+        self.default_lights = default_lights
 
-        #Scene
-        self.scene = self._load_scene(scene_path)
+        #Add ambient lighting (minimum scene light)
+        ambient = AmbientLight('ambient_dull_light')
+        ambient.setColor((.1, .1, .1, 1))
+        self.default_lights.append(ambient)
 
-        #Reparent all UAVs to the scene
+        #Scene graph (holds all scene models)
+        self.scene_holder : NodePath = self.render.attachNewNode("environment_scene_holder")
+        self.reset_scene()
+
+        #Reparent all UAVs to the render node
         for uav in uav_players:
             uav.reparentTo(self.render)
 
-        #Add ambient lighting (minimum scene light)
-        ambient = self.render.attachNewNode(AmbientLight('ambientDullLight'))
-        ambient.node().setColor((.1, .1, .1, 1))
-        self.render.setLight(ambient)
+        #Load given scene
+        if scene_model is not None:
+            self.load_attach_scene(scene_model)
 
         #State
         self.camState = CameraController(app=self)
@@ -181,7 +188,7 @@ class SimulatorApplication(ShowBase):
         self.camLens.setNear(0.1)
         self.debuggerState = dict()
         self.HUDState = dict()
-        self.movementState : Vec4Tuple = None
+        self._movementState : Vec4Tuple = None
 
         #Buffer viewer keybind
         self.accept("v", self.bufferViewer.toggleEnable)
@@ -260,32 +267,41 @@ class SimulatorApplication(ShowBase):
             return uav.controller
 
     def update_engine(self, task : Task):
-        '''Update all objects in the app'''
-        self.movementState = self._getMovementControlState()
+        '''Update all objects in the application'''
+        self._movementState = self._getMovementControlState()
         self._updatePlayerMovementCommand()
         self._updateUAVObjects()
         self._updateCamera()
         self._updateHUD()
         return task.cont
 
-    def load_scene(self, scene_path : typing.Union[os.PathLike, Filename]):
-        self.scene = self._load_scene(scene_path)
-
-    def _load_scene(self, scene_path : typing.Union[os.PathLike, Filename]) -> NodePath:
-        if scene_path is None:
-            scene_path = self.DEFAULT_SCENE
-        sceneModel = self.loader.loadModel(scene_path)
-        sceneModel.setPos(0,0,0)
-        sceneModel.reparentTo(self.render)
-
-        #Move scene lighting to root (render) node
-        #So that all objects are affected by it
-        sceneModel.clear_light()
-        for light in sceneModel.find_all_matches('**/+Light'):
-            light.parent.wrt_reparent_to(self.render)
+    def reset_scene(self):
+        self.render.clear_light()
+        for light_node in self.default_lights:
+            light = self.render.attachNewNode(light_node)
             self.render.setLight(light)
 
-        return sceneModel
+    def load_attach_scene(self, scene_path : typing.Union[str, os.PathLike, Filename, NodePath], position : LVecBase3f = (0,0,0), rotation : LVecBase3f = (0,0,0)):
+        if isinstance(scene_path, NodePath):
+            scene_model = scene_path
+        else:
+            scene_model = self.loader.loadModel(scene_path)
+        self.attach_scene(scene_model)
+        scene_model.setPos(position)
+        scene_model.setHpr(rotation)
+
+    def attach_scene(self, scene_model : NodePath):
+        scene_model.reparentTo(self.scene_holder)
+        self._setup_scene_lighting(scene_model)
+
+    def _setup_scene_lighting(self, scene_model : NodePath):
+        '''
+        Move lights from scene to render node
+        so that all objects are affected by it
+        '''
+        for light in scene_model.find_all_matches('**/+Light'):
+            light.parent.wrt_reparent_to(self.render)
+            self.render.setLight(light)
 
     def eToggleCameraMode(self):
         '''Keybind event handler to switch Camera Mode'''
@@ -353,13 +369,13 @@ class SimulatorApplication(ShowBase):
             uav.update()
 
     def _updateCamera(self):
-        control = self.movementState if self.camState.control == ControllingCharacter.camera else None
+        control = self._movementState if self.camState.control == ControllingCharacter.camera else None
         self.camState.update(globalClock.dt, mvVec=control)
 
     def _updatePlayerMovementCommand(self):
         player = self.activeUAVController
-        if self.movementState is not None and player and self.camState.control == ControllingCharacter.player:
-            player.rc_control(self.movementState)
+        if self._movementState is not None and player and self.camState.control == ControllingCharacter.player:
+            player.rc_control(self._movementState)
 
     def _getMovementControlState(self) -> Vec4Tuple:
         #Returns whether a button/key is pressed
