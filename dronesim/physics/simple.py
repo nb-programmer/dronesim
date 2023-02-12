@@ -1,6 +1,7 @@
 
-from .physicsbase import DronePhysicsEngine, PhysicsStateType, Vec4PID
-from ..types import DroneState, DroneAction, StepActionType, StepRC
+from .physicsbase import DronePhysicsEngine, Vec4PID
+from ..interface import DroneAction, DroneState
+from ..types import StepActionType, StepRC, PhysicsStateType
 
 from simple_pid import PID
 import glm
@@ -67,7 +68,7 @@ class SimpleDronePhysics(DronePhysicsEngine):
             if init_state is not None:
                 self.update(init_state)
 
-    def reset(self, state : PhysicsStateType = None) -> PhysicsStateType:
+    def reset(self, state : typing.Union[State, PhysicsStateType] = None) -> State:
         if state is None:
             state = {}
         if 'control' not in state:
@@ -99,9 +100,9 @@ class SimpleDronePhysics(DronePhysicsEngine):
                 self._state['control'].z.setpoint,
                 self._state['control'].w.setpoint
             ),
-            'operation': self.state['operation']
+            'operation': self._state['operation']
         }
-    
+
     @property
     def state(self):
         return self._state
@@ -112,10 +113,13 @@ class SimpleDronePhysics(DronePhysicsEngine):
 
     @property
     def operation(self):
-        return self.state['operation']
+        return self._state['operation']
 
-    def step(self, action : StepActionType, dt : float = None) -> PhysicsStateType:
-        self.state['ticks'] += 1
+    def step(self, action : StepActionType, dt : float = None) -> State:
+        '''Update the physics engine'''
+        #NOTE: If dt is None, the PID controller choses to use real-time dt. Use fixed value dt to make it repeatable.
+
+        self._state['ticks'] += 1
 
         rcvec, op, params = self.decode_action(action)
 

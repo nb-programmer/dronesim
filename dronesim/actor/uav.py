@@ -72,7 +72,7 @@ class UAVDroneModel(Actor):
             'modelRoot': shell_model,
             **propeller_parts
         }, anims={'modelRoot': {}}) #To use the multipart w/o LOD loader (this is the way to do it)
-        
+
         for bone in propellers.keys():
             #Make node accessible
             self.exposeJoint(None, 'modelRoot', bone)

@@ -20,15 +20,15 @@ class DroneSimulator:
         self.__physics : DronePhysicsEngine = physics_engine
         self.__sensors : typing.Dict[str, SensorBase] = {}
         self.__sensor_state = {}
-        
+
         self.set_default_reset_state(default_reset_state)
         self.set_objective(objective)
 
-        #Physics engine default
+        #Use `SimpleDronePhysics` by default if not provided
         if self.__physics is None:
             self.__physics = SimpleDronePhysics()
-        
-        #Sensor attachment
+
+        #Attach some on-board sensors if requested
         if default_sensors:
             self.add_sensor(ekf0 = IMUSensor())
 
@@ -37,7 +37,7 @@ class DroneSimulator:
         self.__metrics = {}
 
         self.reset()
-        
+
     def add_sensor(self, **sensor : SensorBase):
         #TODO: Maybe add some checks
         self.__sensors.update(**sensor)
@@ -55,12 +55,12 @@ class DroneSimulator:
                 #TODO: Log warning
                 continue
             self.__sensors.get(s).attach_to(self)
-            
-    def step(self, action : StepActionType = None) -> StateType:
+
+    def step(self, action : StepActionType = None, dt : float = 1e-2) -> StateType:
         '''
         Mostly a passthough to the physics engine's step(), with update to the instance (metrics, etc.)
         '''
-        self.__physics.step(action)
+        self.__physics.step(action, dt)
         self.__metrics['ticks'] += 1
 
         return self.get_state()
@@ -76,15 +76,14 @@ class DroneSimulator:
         You can expect it to contain at least 'pos' field with a 3-D vector of some sorts.
 
         Other fields in info may include state of various sensors attached and the 'metrics' for simulation stats
-        
         '''
         obs, fitness, done = None, None, False
         if self.__objective is not None:
             obs, fitness, done = self.__objective.get_observation(), self.__objective.get_fitness(), self.__objective.get_is_done()
         return (obs, fitness, done, {'state': self.state, 'metrics': self.metrics, 'sensors': self.__sensor_state})
 
-    def reset(self, state = None):
-        #Reset the physics engine to set-up the initial state
+    def reset(self, state : typing.Optional[typing.Any] = None) -> StateType:
+        '''Reset the physics engine to set-up the initial state'''
 
         if state is None and self.__default_reset_state is not None:
             state = self.__default_reset_state

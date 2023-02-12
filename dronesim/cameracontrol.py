@@ -7,7 +7,7 @@ from .utils import asarray, deg2rad, clamp, modulo, sin, cos
 
 from direct.showbase.ShowBase import ShowBase
 from direct.actor.Actor import Actor
-from .types import Vec4Tuple
+from .types import InputState, StepRC
 import typing
 
 class CameraControlBase:
@@ -99,6 +99,8 @@ class CameraControlBase:
 class FreeCam(CameraControlBase):
     '''
     Implement Free camera (spectator view) movement
+
+    It controls like Blender fly mode or Counter Strike spectator mode
     '''
     def __init__(self, flySpeed : float = 15.0, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -120,14 +122,64 @@ class FreeCam(CameraControlBase):
     def update(self,
                dt : float,
                lookSensitivity : float = 2000.0,
-               mvVec : Vec4Tuple = None,
+               input_state : InputState = None,
                **kwargs):
 
         hprVec = self._app.camera.getHpr()
         xyzVec = self._app.camera.getPos()
+        mvVec : StepRC = None
+
+        if input_state is not None:
+            mvVec = input_state['movement_vec']
 
         if mvVec is None:
-            mvVec = (0,)*4
+            mvVec = StepRC(0,0,0,0)
+
+        if self.mouseLocked:
+            mx, my = self._grabMouseLockRelative()
+            #Mouse relative pitch and yaw
+            hprVec[0] -= mx * lookSensitivity * dt
+            hprVec[1] -= my * lookSensitivity * dt
+
+        hprVec[0] -= mvVec.velr * lookSensitivity * 3e-2 * dt
+        hprVec[1] += mvVec.velz * lookSensitivity * 3e-2 * dt
+
+        hprVec = tuple(self.restrict_Hpr(hprVec))
+        self._app.camera.setHpr(hprVec)
+
+        #Get updated camera matrix
+        camRotVecFB = self._app.camera.getMat().getRow3(1)
+        camRotVecLR = self._app.camera.getMat().getRow3(0)
+        camRotVecFB.normalize()
+        camRotVecLR.normalize()
+
+        #New camera position based on user control and camera facing direction.
+        #This allows movement in any direction
+        flyVec = camRotVecLR * mvVec.velx * self._flySpeed * dt + camRotVecFB * mvVec.vely * self._flySpeed * dt
+        self._app.camera.setPos(xyzVec + flyVec)
+
+
+class FlyCam(CameraControlBase):
+    '''
+    Implement Free camera movement
+
+    It controls like Minecraft creative flying mode
+    '''
+    def update(self,
+               dt : float,
+               lookSensitivity : float = 2000.0,
+               input_state : InputState = None,
+               **kwargs):
+
+        hprVec = self._app.camera.getHpr()
+        xyzVec = self._app.camera.getPos()
+        mvVec : StepRC = None
+
+        if input_state is not None:
+            mvVec = input_state['movement_vec']
+
+        if mvVec is None:
+            mvVec = StepRC(0,0,0,0)
 
         if self.mouseLocked:
             mx, my = self._grabMouseLockRelative()

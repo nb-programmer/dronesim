@@ -26,4 +26,4 @@ Pretty long at the moment. It is in no particular order
 - [x] Show crosshair
   - [ ] Crosshair blend mode (invert) with what's on screen below it
 - [ ] Allow sensor access to physics engine
-- [ ] Bump mapping on scene to make depth more realistic
+- [x] Bump mapping on scene to make depth more realistic

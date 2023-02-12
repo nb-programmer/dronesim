@@ -33,7 +33,7 @@ Or alternatively, execute the package using the Python interpreter:
 $ python -m dronesim
 ```
 
-Refer to the `examples/` folder for running the simulator with custom controllers
+Refer to the `examples/` folder for running the simulator with custom controllers. You will need to clone this repo in order to access the examples.
 
 ## Controls
 
@@ -48,6 +48,7 @@ Key|Action
 Esc|Unlock/Lock and Show/Hide mouse
 F1|Toggle visibility of HUD
 F3|Toggle visibility of debug view
+Shift+F3|Connect to Panda3D's PStats tool for profiling
 F5|Change camera mode from one of [Free, First Person or Third Person]
 F6|Toggle your control between camera and UAV
 F11|Toggle fullscreen

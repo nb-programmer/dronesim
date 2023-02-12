@@ -1,12 +1,9 @@
 
-#Simulated drone
-from dronesim import make_uav
+#Simulated drone and application
+from dronesim import SimulatorApplication, make_uav
 
 #Sensors
 from dronesim.sensor.panda3d.camera import Panda3DCameraSensor
-
-#App window
-from dronesim.simapp import SimulatorApplication
 
 import argparse
 
@@ -19,23 +16,23 @@ def main():
     sim, controller, drone = make_uav()
 
     #Application window with the drone entity added
-    droneWindow = SimulatorApplication(drone)
+    simulator_window = SimulatorApplication(drone)
 
     # ** Configure the simulator by adding sensors **
 
     #Add a camera sensor facing down
     #NOTE: having texture of a power of 2 helps in memory optimization
-    downCam = Panda3DCameraSensor("downCameraRGB", size=(512,512))
-    sim.add_sensor(down_camera_rgb = downCam)
+    down_cam = Panda3DCameraSensor("downCameraRGB", size=(512,512))
+    sim.add_sensor(down_camera_rgb = down_cam)
     #Insert camera into main app window and attach to the scene
-    downCam.attach_to_env(droneWindow.render, droneWindow.graphicsEngine, droneWindow.win)
+    down_cam.attach_to_env(simulator_window.render, simulator_window.graphicsEngine, simulator_window.win)
     #Move and rotate camera with the UAV object
-    downCam.reparentTo(drone)
+    down_cam.reparentTo(drone)
     #Face down
-    downCam.setHpr(0, -90, 0)
+    down_cam.setHpr(0, -90, 0)
 
     #Start the app
-    droneWindow.run()
+    simulator_window.run()
 
 if __name__ == "__main__":
     main()

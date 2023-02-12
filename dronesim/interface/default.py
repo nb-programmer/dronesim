@@ -1,11 +1,14 @@
 
 from .control import IDroneControllable
+from .action import DroneAction
+from .state import DroneState
+from ..types import  StepRC, StepActionType
 from ..simulator import DroneSimulator
-from ..types import DroneAction, DroneState, StepRC, StepActionType
 
 from queue import Queue, Empty
 from contextlib import suppress
 
+from typing import Optional
 import threading, time
 
 #Extends Thread, implements IDroneControllable
@@ -20,6 +23,7 @@ class DefaultDroneControl(threading.Thread, IDroneControllable):
                  tick_rate : float = 100,
                  auto_start : bool = True,
                  update_enable : bool = True,
+                 use_physics_dt : bool = False,
                  tps_update_period : float = 1,
                  wait_till_started : bool = True):
         super().__init__(daemon=True, target=self._droneTickLoop)
@@ -31,6 +35,8 @@ class DefaultDroneControl(threading.Thread, IDroneControllable):
         self._tps_update_period = tps_update_period
         if self._tps_update_period <= 0:
             self._tps_update_period = 1.0
+
+        self._use_dt = use_physics_dt
 
         self.__debug_data = dict(tps=0)
         #Store last state
@@ -75,6 +81,8 @@ class DefaultDroneControl(threading.Thread, IDroneControllable):
         self._ev_started.set()
 
         while True:
+            tick_period = (1.0 / self._tick_rate)
+
             #Get action given
             cmd = None
             with suppress(Empty):
@@ -83,7 +91,7 @@ class DefaultDroneControl(threading.Thread, IDroneControllable):
 
             #Perform step, even if no commands are available
             if self._update_enable:
-                self.__state = self.drone.step(cmd)
+                self.__state = self.drone.step(cmd, tick_period if self._use_dt else None)
 
             #Update TPS
             if time.time() - last_tick_check >= self._tps_update_period:
@@ -91,7 +99,7 @@ class DefaultDroneControl(threading.Thread, IDroneControllable):
                 last_ticks = self.drone.metrics['ticks']
                 self.__debug_data['tps'] = int(tickDiff)
                 last_tick_check = time.time()
-                
+
             #Update debug state info from the simulation step
             if self.__state is not None:
                 observation, reward, done, info = self.__state
@@ -103,7 +111,7 @@ class DefaultDroneControl(threading.Thread, IDroneControllable):
                 })
 
             #Wait for next step (keeping constant rate)
-            next_time += (1.0 / self._tick_rate)
+            next_time += tick_period
             delaySleep = max(0, next_time - time.time())
             time.sleep(delaySleep)
 
@@ -118,6 +126,12 @@ class DefaultDroneControl(threading.Thread, IDroneControllable):
 
     def rc_control(self, vector : StepRC):
         self.__cmd_queue.put_nowait(vector)
+
+    def direct_action(self, action : DroneAction, **params):
+        self.__cmd_queue.put_nowait({
+            'action': action,
+            'params': params
+        })
 
     def takeoff(self, blocking=True, timeout=None):
         self.__cmd_queue.put_nowait({
@@ -141,15 +155,31 @@ class DefaultDroneControl(threading.Thread, IDroneControllable):
                     return self.drone.state.get('operation') == DroneState.LANDED
                 self._predicate.wait_for(_wait_land, timeout)
 
+    def move_left(self, x : float, s : Optional[float] = None, blocking=True, timeout=None):
+        raise NotImplementedError()
+
+    def move_right(self, x : float, s : Optional[float] = None, blocking=True, timeout=None):
+        raise NotImplementedError()
+
+    def move_forward(self, x : float, s : Optional[float] = None, blocking=True, timeout=None):
+        raise NotImplementedError()
+
+    def move_backward(self, x : float, s : Optional[float] = None, blocking=True, timeout=None):
+        raise NotImplementedError()
+
+    def move_up(self, x : float, s : Optional[float] = None, blocking=True, timeout=None):
+        raise NotImplementedError()
+
+    def move_down(self, x : float, s : Optional[float] = None, blocking=True, timeout=None):
+        raise NotImplementedError()
+
+    def rotate_clockwise(self, x : float, s : Optional[float] = None, blocking=True, timeout=None):
+        raise NotImplementedError()
+
+    def rotate_counterclockwise(self, x : float, s : Optional[float] = None, blocking=True, timeout=None):
+        raise NotImplementedError()
+
     def freeze(self, blocking=True, timeout=None):
         self.__cmd_queue.put_nowait({
             'action': DroneAction.STOP_IN_PLACE
-        })
-
-
-
-    def direct_action(self, action : DroneAction, **params):
-        self.__cmd_queue.put_nowait({
-            'action': action,
-            **params
         })

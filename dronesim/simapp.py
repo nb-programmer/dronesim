@@ -8,10 +8,13 @@ from panda3d.core import (
     ButtonHandle,
     KeyboardButton,
     Light,
+    DirectionalLight,
+    Spotlight,
     AmbientLight,
     LPoint3f, LVecBase3f, LPoint4f,
-    NodePath, TextNode, SamplerState,
-    TransparencyAttrib
+    NodePath, PandaNode, TextNode, SamplerState,
+    TransparencyAttrib,
+    PStatClient
 )
 
 from direct.showbase.ShowBase import ShowBase
@@ -22,12 +25,14 @@ from direct.actor.Actor import Actor
 from direct.task.Task import Task
 
 from . import PACKAGE_BASE
-from .interface.control import IDroneControllable
+from .interface import IDroneControllable, DroneAction
 from .utils import IterEnumMixin, HUDMixin
-from .types import Vec4Tuple, DroneAction
+from .types import InputState, StepRC
 
 from .cameracontrol import FreeCam, FPCamera, TPCamera
 from .actor.uav import UAVDroneModel
+
+import simplepbr
 
 import os
 import glm
@@ -47,8 +52,8 @@ texture-anisotropic-degree 16
 loadPrcFileData("", DEFAULT_CONFIG_VARS)
 
 #Instruct the Virtual File System to mount the real 'assets/' folder to the virtual directory '/assets/'
-ASSETS = VirtualFileSystem.getGlobalPtr()
-ASSETS.mount(
+ASSETS_VFS = VirtualFileSystem.getGlobalPtr()
+ASSETS_VFS.mount(
     VirtualFileMountSystem(Filename.from_os_specific(
         os.path.join(PACKAGE_BASE, 'assets/')
     )),
@@ -56,8 +61,8 @@ ASSETS.mount(
     VirtualFileSystem.MFReadOnly
 )
 
-#Add virtual assets directory to load models and scenes from to the Loader's search path
-getModelPath().appendDirectory('/assets')
+#Add virtual assets directory to load models and scenes from to the loader's search path
+getModelPath().prepend_directory('/assets')
 
 #Colors used for some HUD elements as foreground (text color) and background
 HUD_COLORS = dict(
@@ -150,25 +155,26 @@ class SimulatorApplication(ShowBase):
             self,
             *uav_players : UAVDroneModel,
             scene_model : typing.Optional[typing.Union[str, os.PathLike, Filename, NodePath]] = DEFAULT_SCENE,
-            default_lights : typing.List[Light] = [],
+            attach_lights : typing.List[typing.Union[Light, NodePath]] = [],
+            enable_dull_ambient_light : bool = True,
             **kwargs
         ):
         super().__init__(**kwargs)
         self.disableMouse() # Disable default mouse control
-        self.render.setShaderAuto()
 
-        #TODO: Test import, if fail, fallback to auto shader. Once done, make panda3d-simplepbr optional.
-        import simplepbr
-        simplepbr.init(enable_shadows=False)
+        self.pbr_pipeline = simplepbr.Pipeline(
+            enable_shadows=False,
+            enable_fog=False
+        )
 
         self._all_uavs : typing.List[UAVDroneModel] = list(uav_players)
-
-        self.default_lights = default_lights
+        self.attach_lights = attach_lights
 
         #Add ambient lighting (minimum scene light)
-        ambient = AmbientLight('ambient_dull_light')
-        ambient.setColor((.1, .1, .1, 1))
-        self.default_lights.append(ambient)
+        if enable_dull_ambient_light:
+            ambient = AmbientLight('ambient_dull_light')
+            ambient.setColor((.1, .1, .1, 1))
+            self.attach_lights.append(ambient)
 
         #Scene graph (holds all scene models)
         self.scene_holder : NodePath = self.render.attachNewNode("environment_scene_holder")
@@ -176,19 +182,25 @@ class SimulatorApplication(ShowBase):
 
         #Reparent all UAVs to the render node
         for uav in uav_players:
-            uav.reparentTo(self.render)
+            uav.instance_to(self.render)
 
         #Load given scene
         if scene_model is not None:
             self.load_attach_scene(scene_model)
 
-        #State
-        self.camState = CameraController(app=self)
         self.camera.setPos(0, -10, 10)
         self.camLens.setNear(0.1)
+
+        #State
+        self.camState = CameraController(app=self)
         self.debuggerState = dict()
         self.HUDState = dict()
-        self._movementState : Vec4Tuple = None
+        self.input_state = InputState(
+            movement_vec=None,
+            is_jump_pressed=False,
+            is_crouch_pressed=False,
+            is_dash=False
+        )
 
         #Buffer viewer keybind
         self.accept("v", self.bufferViewer.toggleEnable)
@@ -200,6 +212,7 @@ class SimulatorApplication(ShowBase):
         self.accept("wheel_down", self.eMouseWheelScroll, [-1])
         self.accept("f1", self.eToggleHUDView)
         self.accept("f3", self.eToggleDebugView)
+        self.accept("shift-f3", self.eConnectPStats)
         self.accept("f5", self.eToggleCameraMode)
         self.accept("f6", self.eToggleControlMode)
         self.accept("f11", self.eToggleFullscreen)
@@ -268,7 +281,7 @@ class SimulatorApplication(ShowBase):
 
     def update_engine(self, task : Task):
         '''Update all objects in the application'''
-        self._movementState = self._getMovementControlState()
+        self._updateInputState()
         self._updatePlayerMovementCommand()
         self._updateUAVObjects()
         self._updateCamera()
@@ -277,21 +290,38 @@ class SimulatorApplication(ShowBase):
 
     def reset_scene(self):
         self.render.clear_light()
-        for light_node in self.default_lights:
-            light = self.render.attachNewNode(light_node)
+        for light_node in self.attach_lights:
+            if isinstance(light_node, Light):
+                light = self.render.attachNewNode(light_node)
+            elif isinstance(light_node, NodePath):
+                light = light_node
+                light.reparentTo(self.render)
+
+            if isinstance(light.node(), (DirectionalLight, Spotlight)):
+                light.node().setScene(self.render)
+                light.node().setShadowCaster(True, 512, 512)
             self.render.setLight(light)
 
-    def load_attach_scene(self, scene_path : typing.Union[str, os.PathLike, Filename, NodePath], position : LVecBase3f = (0,0,0), rotation : LVecBase3f = (0,0,0)):
-        if isinstance(scene_path, NodePath):
-            scene_model = scene_path
-        else:
+    def load_attach_scene(self,
+            scene_path : typing.Union[str, os.PathLike, Filename, NodePath],
+            position : LVecBase3f = (0,0,0),
+            rotation : LVecBase3f = (0,0,0)) -> NodePath:
+        if isinstance(scene_path, (str, os.PathLike, Filename)):
+            #Load scene from given path
             scene_model = self.loader.loadModel(scene_path)
+        elif isinstance(scene_path, NodePath):
+            scene_model = scene_path
+        elif isinstance(scene_path, PandaNode):
+            scene_model = NodePath(scene_path)
+        else:
+            raise TypeError("Argument `scene_path` is not a valid type.")
         self.attach_scene(scene_model)
         scene_model.setPos(position)
         scene_model.setHpr(rotation)
+        return scene_model
 
     def attach_scene(self, scene_model : NodePath):
-        scene_model.reparentTo(self.scene_holder)
+        scene_model.instance_to(self.scene_holder)
         self._setup_scene_lighting(scene_model)
 
     def _setup_scene_lighting(self, scene_model : NodePath):
@@ -301,7 +331,8 @@ class SimulatorApplication(ShowBase):
         '''
         for light in scene_model.find_all_matches('**/+Light'):
             light.parent.wrt_reparent_to(self.render)
-            self.render.setLight(light)
+            light.node().set_shadow_caster(True, 512, 512)
+            self.render.set_light(light)
 
     def eToggleCameraMode(self):
         '''Keybind event handler to switch Camera Mode'''
@@ -332,6 +363,13 @@ class SimulatorApplication(ShowBase):
             self.HUD_debug_info.show()
         else:
             self.HUD_debug_info.hide()
+
+    def eConnectPStats(self):
+        '''Start connection with Pandas' PStats server'''
+        if not PStatClient.isConnected():
+            PStatClient.connect()
+        else:
+            PStatClient.disconnect()
 
     def eToggleControlMode(self):
         self.camState.control = next(self.camState.control)
@@ -364,23 +402,60 @@ class SimulatorApplication(ShowBase):
         if player:
             player.direct_action(cmd, **params)
 
+    def _updateInputState(self):
+        self.input_state['movement_vec'] = self._getMovementControlState()
+        if self.input_state['movement_vec'].vely > 0.25:
+            if self.is_button_down(KeyboardButton.control()):
+                self.input_state['is_dash'] = True
+        else:
+            self.input_state['is_dash'] = False
+
+        self.input_state['is_jump_pressed'] = self.is_button_down(KeyboardButton.space())
+        self.input_state['is_crouch_pressed'] = self.is_button_down(KeyboardButton.shift())
+
     def _updateUAVObjects(self):
         for uav in self._all_uavs:
             uav.update()
 
     def _updateCamera(self):
-        control = self._movementState if self.camState.control == ControllingCharacter.camera else None
-        self.camState.update(globalClock.dt, mvVec=control)
+        control = self.input_state if self.camState.control == ControllingCharacter.camera else None
+        self.camState.update(globalClock.dt, input_state=control)
 
     def _updatePlayerMovementCommand(self):
         player = self.activeUAVController
-        if self._movementState is not None and player and self.camState.control == ControllingCharacter.player:
-            player.rc_control(self._movementState)
+        mv_vec = self.input_state['movement_vec']
+        if mv_vec is not None and player and self.camState.control == ControllingCharacter.player:
+            player.rc_control(mv_vec)
 
-    def _getMovementControlState(self) -> Vec4Tuple:
-        #Returns whether a button/key is pressed
-        isDown : typing.Callable[[ButtonHandle], bool] = self.mouseWatcherNode.isButtonDown
+    def _updateHUD(self):
+        self.HUD_basic_info.setText(self.formatDictToHUD(self.camState.hud(), serializer=objectHUDFormatter))
 
+        uav = self.activeUAVController
+        uav_debug_data = uav.get_debug_data() if uav else {}
+
+        self.debuggerState.update({
+            'fps': globalClock.getAverageFrameRate(),
+            'input': self.input_state,
+            'active_uav': uav_debug_data,
+            'camera': self.camState.camMode.state
+        })
+        self.HUD_debug_info.setText(
+            self.formatDictToHUD(self.debuggerState, serializer=objectHUDFormatter)
+        )
+
+    def print_scene_graph(self):
+        '''Print hierarchy of the `scene` graph'''
+        self.scene_holder.ls()
+
+    def print_render_graph(self):
+        '''Print hierarchy of the entire render graph'''
+        self.render.ls()
+
+    def is_button_down(self, btn : ButtonHandle) -> bool:
+        '''Returns whether a button/key is pressed'''
+        return self.mouseWatcherNode.isButtonDown(btn)
+
+    def _getMovementControlState(self) -> StepRC:
         btnFw = KeyboardButton.ascii_key('w')
         btnBw = KeyboardButton.ascii_key('s')
         btnL = KeyboardButton.ascii_key('a')
@@ -391,28 +466,12 @@ class SimulatorApplication(ShowBase):
         btnUArrow = KeyboardButton.up()
         btnDArrow = KeyboardButton.down()
 
-        state_lr = (isDown(btnR) - isDown(btnL))
-        state_fwbw = (isDown(btnFw) - isDown(btnBw))
-        state_yawlr = (isDown(btnRArrow) - isDown(btnLArrow))
-        state_altud = (isDown(btnUArrow) - isDown(btnDArrow))
+        state_lr = (self.is_button_down(btnR) - self.is_button_down(btnL))
+        state_fwbw = (self.is_button_down(btnFw) - self.is_button_down(btnBw))
+        state_yawlr = (self.is_button_down(btnRArrow) - self.is_button_down(btnLArrow))
+        state_altud = (self.is_button_down(btnUArrow) - self.is_button_down(btnDArrow))
 
-        #Order is the same as the arguments of 'StepRC' type
-        return (state_lr, state_fwbw, state_altud, state_yawlr)
-
-    def _updateHUD(self):
-        self.HUD_basic_info.setText(self.formatDictToHUD(self.camState.hud(), serializer=objectHUDFormatter))
-
-        uav = self.activeUAVController
-        uav_debug_data = uav.get_debug_data() if uav else {}
-
-        self.debuggerState.update({
-            'fps': globalClock.getAverageFrameRate(),
-            'uav': uav_debug_data,
-            'camera': self.camState.camMode.state
-        })
-        self.HUD_debug_info.setText(
-            self.formatDictToHUD(self.debuggerState, serializer=objectHUDFormatter)
-        )
+        return StepRC(state_lr, state_fwbw, state_altud, state_yawlr)
 
     @staticmethod
     def formatDictToHUD(d : dict, serializer : typing.Callable[[typing.Any], str] = str, level=0):
@@ -422,4 +481,3 @@ class SimulatorApplication(ShowBase):
             else (' '*level+k+': '+serializer(v))
             for k,v in d.items()
         )
-
