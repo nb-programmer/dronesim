@@ -4,7 +4,7 @@ from panda3d.core import NodePath, Filename
 
 from dronesim.interface.control import IDroneControllable
 from dronesim.utils import rad2deg
-from dronesim.types import StateType
+from dronesim.types import PandaFilePath, StateType
 
 import os
 import typing
@@ -31,14 +31,14 @@ class UAVDroneModel(Actor):
     '''
     def __init__(self,
                  control_source : IDroneControllable,
-                 shell_model : typing.Union[NodePath, os.PathLike, Filename] = None,
-                 propellers : typing.Dict[str, typing.Union[NodePath, os.PathLike, Filename]] = None,
+                 shell_model : typing.Union[PandaFilePath, NodePath] = None,
+                 propellers : typing.Dict[str, typing.Union[PandaFilePath, NodePath]] = None,
                  propeller_spin : typing.Dict[str, float] = None):
         self._control_source = control_source
 
         if shell_model is None:
             shell_model = Filename("models/quad-shell.glb")
-        
+
         #Default propeller models
         if propellers is None:
             prop_model_cw = Filename("models/propeller.glb")
@@ -57,15 +57,15 @@ class UAVDroneModel(Actor):
                     "PropellerJoint3": 1,
                     "PropellerJoint4": 1
                 }
-        
+
         if propeller_spin is None:
             propeller_spin = dict()
-            
+
         propeller_spin.update({k: 1 for k in propellers.keys() if k not in propeller_spin})
 
         #Prefix so that it doesn't clash with original bone node
         propeller_parts = {'p_%s'%k:v for k,v in propellers.items()}
-        
+
         self.joints = {'propellers': {}}
 
         super().__init__({

@@ -2,8 +2,11 @@
 '''Type aliases for use in the simulator'''
 
 import typing
+import os
 from .interface.action import DroneAction
+from panda3d.core import Filename
 
+PandaFilePath = typing.Union[str, os.PathLike, Filename]
 Vec3Tuple = typing.Tuple[float, float, float]
 Vec4Tuple = typing.Tuple[float, float, float, float]
 PhysicsStateType = typing.Dict[str, typing.Any]

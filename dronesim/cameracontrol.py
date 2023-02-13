@@ -50,12 +50,12 @@ class CameraControlBase:
     
     def state(self):
         return {
-            'pos': self._app.camera.getPos(),
-            'facing': self._app.camera.getHpr()
+            'pos': self._app.camera.get_pos(),
+            'facing': self._app.camera.get_hpr()
         }
 
     @staticmethod
-    def restrict_Hpr(hprVec, p_range : typing.Tuple[float, float] = (-90,90), r_range : typing.Tuple[float, float] = (-90,90)):
+    def restrict_hpr(hprVec, p_range : typing.Tuple[float, float] = (-90,90), r_range : typing.Tuple[float, float] = (-90,90)):
         h, p, r = hprVec
         h = modulo(h, 360)
         p, r = clamp((p, r), [p_range[0], r_range[0]], [p_range[1], r_range[1]])
@@ -73,12 +73,12 @@ class CameraControlBase:
         Returns X and Y relative movement.
         '''
         win = self._app.win
-        md = win.getPointer(0)
-        x = md.getX()
-        y = md.getY()
-        cx, cy = win.getXSize()//2, win.getYSize()//2
+        md = win.get_pointer(0)
+        x = md.get_x()
+        y = md.get_y()
+        cx, cy = win.get_x_size()//2, win.get_y_size()//2
         heading, pitch = 0, 0
-        if win.movePointer(0, cx, cy):
+        if win.move_pointer(0, cx, cy):
             heading = (x - cx) / cx
             pitch = (y - cy) / cy
         if self._skip_update > 0:
@@ -87,14 +87,14 @@ class CameraControlBase:
         return (heading, pitch)
     def _mouseModeRelative(self):
         props = WindowProperties()
-        props.setCursorHidden(True)
-        props.setMouseMode(WindowProperties.M_relative)
-        self._app.win.requestProperties(props)
+        props.set_cursor_hidden(True)
+        props.set_mouse_mode(WindowProperties.M_relative)
+        self._app.win.request_properties(props)
     def _mouseModeUnlocked(self):
         props = WindowProperties()
-        props.setCursorHidden(False)
-        props.setMouseMode(WindowProperties.M_absolute)
-        self._app.win.requestProperties(props)
+        props.set_cursor_hidden(False)
+        props.set_mouse_mode(WindowProperties.M_absolute)
+        self._app.win.request_properties(props)
 
 class FreeCam(CameraControlBase):
     '''
@@ -125,8 +125,8 @@ class FreeCam(CameraControlBase):
                input_state : InputState = None,
                **kwargs):
 
-        hprVec = self._app.camera.getHpr()
-        xyzVec = self._app.camera.getPos()
+        hprVec = self._app.camera.get_hpr()
+        xyzVec = self._app.camera.get_pos()
         mvVec : StepRC = None
 
         if input_state is not None:
@@ -144,19 +144,19 @@ class FreeCam(CameraControlBase):
         hprVec[0] -= mvVec.velr * lookSensitivity * 3e-2 * dt
         hprVec[1] += mvVec.velz * lookSensitivity * 3e-2 * dt
 
-        hprVec = tuple(self.restrict_Hpr(hprVec))
-        self._app.camera.setHpr(hprVec)
+        hprVec = tuple(self.restrict_hpr(hprVec))
+        self._app.camera.set_hpr(hprVec)
 
         #Get updated camera matrix
-        camRotVecFB = self._app.camera.getMat().getRow3(1)
-        camRotVecLR = self._app.camera.getMat().getRow3(0)
+        camRotVecFB = self._app.camera.get_mat().get_row3(1)
+        camRotVecLR = self._app.camera.get_mat().get_row3(0)
         camRotVecFB.normalize()
         camRotVecLR.normalize()
 
         #New camera position based on user control and camera facing direction.
         #This allows movement in any direction
         flyVec = camRotVecLR * mvVec.velx * self._flySpeed * dt + camRotVecFB * mvVec.vely * self._flySpeed * dt
-        self._app.camera.setPos(xyzVec + flyVec)
+        self._app.camera.set_pos(xyzVec + flyVec)
 
 
 class FlyCam(CameraControlBase):
@@ -171,8 +171,8 @@ class FlyCam(CameraControlBase):
                input_state : InputState = None,
                **kwargs):
 
-        hprVec = self._app.camera.getHpr()
-        xyzVec = self._app.camera.getPos()
+        hprVec = self._app.camera.get_hpr()
+        xyzVec = self._app.camera.get_pos()
         mvVec : StepRC = None
 
         if input_state is not None:
@@ -187,19 +187,19 @@ class FlyCam(CameraControlBase):
             hprVec[0] -= mx * lookSensitivity * dt
             hprVec[1] -= my * lookSensitivity * dt
 
-        hprVec = tuple(self.restrict_Hpr(hprVec))
-        self._app.camera.setHpr(hprVec)
+        hprVec = tuple(self.restrict_hpr(hprVec))
+        self._app.camera.set_hpr(hprVec)
 
         #Get updated camera matrix
-        camRotVecFB = self._app.camera.getMat().getRow3(1)
-        camRotVecLR = self._app.camera.getMat().getRow3(0)
+        camRotVecFB = self._app.camera.get_mat().get_row3(1)
+        camRotVecLR = self._app.camera.get_mat().get_row3(0)
         camRotVecFB.normalize()
         camRotVecLR.normalize()
 
         #New camera position based on user control and camera facing direction.
         #This allows movement in any direction
-        flyVec = camRotVecLR * mvVec[0] * self._flySpeed * dt + camRotVecFB * mvVec[1] * self._flySpeed * dt
-        self._app.camera.setPos(xyzVec + flyVec)
+        flyVec = camRotVecLR * mvVec[0] * dt + camRotVecFB * mvVec[1] * dt
+        self._app.camera.set_pos(xyzVec + flyVec)
 
 class FPCamera(CameraControlBase):
     '''
@@ -216,7 +216,7 @@ class FPCamera(CameraControlBase):
                dt : float,
                lookSensitivity : float = 2000.0,
                **kwargs):
-        hprVec = self._app.camera.getHpr()
+        hprVec = self._app.camera.get_hpr()
 
         if self.mouseLocked:
             mx, my = self._grabMouseLockRelative()
@@ -224,10 +224,9 @@ class FPCamera(CameraControlBase):
             hprVec[0] -= mx * lookSensitivity * dt
             hprVec[1] -= my * lookSensitivity * dt
 
-        hprVec = tuple(self.restrict_Hpr(hprVec))
-        self._app.camera.setHpr(hprVec)
-        self._app.camera.setPos(self._followObj.getPos())
-
+        hprVec = tuple(self.restrict_hpr(hprVec))
+        self._app.camera.set_hpr(hprVec)
+        self._app.camera.set_pos(self._followObj.get_pos())
 
 class TPCamera(CameraControlBase):
     '''
@@ -268,9 +267,9 @@ class TPCamera(CameraControlBase):
             self._cam_hprVec[1] += my * lookSensitivity * dt
 
         #Limit pitch not exactly to +/-90 degree so that lookAt does not flip image when it is exactly 90
-        self._cam_hprVec = self.restrict_Hpr(self._cam_hprVec, p_range=(-89.999,89.999))
+        self._cam_hprVec = self.restrict_hpr(self._cam_hprVec, p_range=(-89.999,89.999))
 
-        _target_pos = self._followObj.getPos()
+        _target_pos = self._followObj.get_pos()
         heading_rads = deg2rad(self._cam_hprVec[0])
         pitch_rads = deg2rad(self._cam_hprVec[1])
         pitch_cos = cos(pitch_rads)
@@ -282,5 +281,5 @@ class TPCamera(CameraControlBase):
             _target_pos[2] + sin(pitch_rads) * self._orbit_radius
         )
 
-        self._app.camera.setPos(_cam_orbit_xyz)
-        self._app.camera.lookAt(self._followObj)
+        self._app.camera.set_pos(_cam_orbit_xyz)
+        self._app.camera.look_at(self._followObj)

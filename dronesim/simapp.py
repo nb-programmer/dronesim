@@ -27,7 +27,7 @@ from direct.task.Task import Task
 from . import PACKAGE_BASE
 from .interface import IDroneControllable, DroneAction
 from .utils import IterEnumMixin, HUDMixin
-from .types import InputState, StepRC
+from .types import PandaFilePath, InputState, StepRC
 
 from .cameracontrol import FreeCam, FPCamera, TPCamera
 from .actor.uav import UAVDroneModel
@@ -52,7 +52,7 @@ texture-anisotropic-degree 16
 loadPrcFileData("", DEFAULT_CONFIG_VARS)
 
 #Instruct the Virtual File System to mount the real 'assets/' folder to the virtual directory '/assets/'
-ASSETS_VFS = VirtualFileSystem.getGlobalPtr()
+ASSETS_VFS = VirtualFileSystem.get_global_ptr()
 ASSETS_VFS.mount(
     VirtualFileMountSystem(Filename.from_os_specific(
         os.path.join(PACKAGE_BASE, 'assets/')
@@ -154,13 +154,13 @@ class SimulatorApplication(ShowBase):
     def __init__(
             self,
             *uav_players : UAVDroneModel,
-            scene_model : typing.Optional[typing.Union[str, os.PathLike, Filename, NodePath]] = DEFAULT_SCENE,
+            scene_model : typing.Optional[typing.Union[PandaFilePath, NodePath]] = DEFAULT_SCENE,
             attach_lights : typing.List[typing.Union[Light, NodePath]] = [],
             enable_dull_ambient_light : bool = True,
             **kwargs
         ):
         super().__init__(**kwargs)
-        self.disableMouse() # Disable default mouse control
+        self.disable_mouse() # Disable default mouse control
 
         self.pbr_pipeline = simplepbr.Pipeline(
             enable_shadows=False,
@@ -173,11 +173,11 @@ class SimulatorApplication(ShowBase):
         #Add ambient lighting (minimum scene light)
         if enable_dull_ambient_light:
             ambient = AmbientLight('ambient_dull_light')
-            ambient.setColor((.1, .1, .1, 1))
+            ambient.set_color((.1, .1, .1, 1))
             self.attach_lights.append(ambient)
 
         #Scene graph (holds all scene models)
-        self.scene_holder : NodePath = self.render.attachNewNode("environment_scene_holder")
+        self.scene_holder : NodePath = self.render.attach_new_node("environment_scene_holder")
         self.reset_scene()
 
         #Reparent all UAVs to the render node
@@ -188,8 +188,8 @@ class SimulatorApplication(ShowBase):
         if scene_model is not None:
             self.load_attach_scene(scene_model)
 
-        self.camera.setPos(0, -10, 10)
-        self.camLens.setNear(0.1)
+        self.camera.set_pos(0, -10, 10)
+        self.camLens.set_near(0.1)
 
         #State
         self.camState = CameraController(app=self)
@@ -210,6 +210,8 @@ class SimulatorApplication(ShowBase):
         self.accept("escape", self.eToggleMouseCapture)
         self.accept("wheel_up", self.eMouseWheelScroll, [1])
         self.accept("wheel_down", self.eMouseWheelScroll, [-1])
+        self.accept("shift-wheel_up", self.eMouseWheelScroll, [0.25])
+        self.accept("shift-wheel_down", self.eMouseWheelScroll, [-0.25])
         self.accept("f1", self.eToggleHUDView)
         self.accept("f3", self.eToggleDebugView)
         self.accept("shift-f3", self.eConnectPStats)
@@ -265,8 +267,8 @@ class SimulatorApplication(ShowBase):
             pos = (0,0,0),
             scale = (0.12, 1, 0.12)
         )
-        self.HUD_crosshair.setTransparency(TransparencyAttrib.MAlpha)
-        self.HUD_crosshair.setColor((1,1,1,0.33))
+        self.HUD_crosshair.set_transparency(TransparencyAttrib.MAlpha)
+        self.HUD_crosshair.set_color((1,1,1,0.33))
 
     @property
     def activeUAVNode(self) -> typing.Optional[UAVDroneModel]:
@@ -292,23 +294,23 @@ class SimulatorApplication(ShowBase):
         self.render.clear_light()
         for light_node in self.attach_lights:
             if isinstance(light_node, Light):
-                light = self.render.attachNewNode(light_node)
+                light = self.render.attach_new_node(light_node)
             elif isinstance(light_node, NodePath):
                 light = light_node
-                light.reparentTo(self.render)
+                light.reparent_to(self.render)
 
             if isinstance(light.node(), (DirectionalLight, Spotlight)):
-                light.node().setScene(self.render)
-                light.node().setShadowCaster(True, 512, 512)
-            self.render.setLight(light)
+                light.node().set_scene(self.render)
+                light.node().set_shadow_caster(True, 512, 512)
+            self.render.set_light(light)
 
     def load_attach_scene(self,
-            scene_path : typing.Union[str, os.PathLike, Filename, NodePath],
+            scene_path : typing.Union[PandaFilePath, NodePath],
             position : LVecBase3f = (0,0,0),
             rotation : LVecBase3f = (0,0,0)) -> NodePath:
         if isinstance(scene_path, (str, os.PathLike, Filename)):
             #Load scene from given path
-            scene_model = self.loader.loadModel(scene_path)
+            scene_model = self.loader.load_model(scene_path)
         elif isinstance(scene_path, NodePath):
             scene_model = scene_path
         elif isinstance(scene_path, PandaNode):
@@ -316,8 +318,8 @@ class SimulatorApplication(ShowBase):
         else:
             raise TypeError("Argument `scene_path` is not a valid type.")
         self.attach_scene(scene_model)
-        scene_model.setPos(position)
-        scene_model.setHpr(rotation)
+        scene_model.set_pos(position)
+        scene_model.set_hpr(rotation)
         return scene_model
 
     def attach_scene(self, scene_model : NodePath):
@@ -365,11 +367,8 @@ class SimulatorApplication(ShowBase):
             self.HUD_debug_info.hide()
 
     def eConnectPStats(self):
-        '''Start connection with Pandas' PStats server'''
-        if not PStatClient.isConnected():
-            PStatClient.connect()
-        else:
-            PStatClient.disconnect()
+        '''Start connection with Pandas' PStats server, or disconnects from it'''
+        self._toggle_pstats_connection()
 
     def eToggleControlMode(self):
         self.camState.control = next(self.camState.control)
@@ -393,7 +392,7 @@ class SimulatorApplication(ShowBase):
         '''
 
     def eHandleUAVStateDump(self):
-        '''Dump the current state object to stdout'''
+        '''Dump the current state object of the active UAV to stdout'''
         print(self.activeUAVController.get_current_state(), flush=True)
 
     def eHandleUAVCommandSend(self, cmd : DroneAction, **params):
@@ -454,6 +453,12 @@ class SimulatorApplication(ShowBase):
     def is_button_down(self, btn : ButtonHandle) -> bool:
         '''Returns whether a button/key is pressed'''
         return self.mouseWatcherNode.isButtonDown(btn)
+
+    def _toggle_pstats_connection(self):
+        if not PStatClient.isConnected():
+            PStatClient.connect()
+        else:
+            PStatClient.disconnect()
 
     def _getMovementControlState(self) -> StepRC:
         btnFw = KeyboardButton.ascii_key('w')
