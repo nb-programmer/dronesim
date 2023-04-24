@@ -4,18 +4,17 @@ import os
 
 # Package meta-data.
 NAME = 'dronesim'
-DESCRIPTION = 'Simulate a UAV for AI applications in 3D environments'
+DESCRIPTION = 'Simulate a Vehicle for AI applications in 3D environments'
 URL = 'https://github.com/nb-programmer/dronesim'
 EMAIL = 'narayanband1356@gmail.com'
 AUTHOR = 'nb-programmer'
 REQUIRES_PYTHON = '>=3.7.0'
-VERSION = '0.6.1'
+VERSION = '0.7.0'
 LICENSE = 'MIT'
 
 REQUIRED = [
-    'Panda3D',              # The 3D game engine that does all the heavy lifting of rendering
+    'Panda3D',              # The 3D engine that does all the heavy lifting of rendering, i/o and physics
     'panda3d-gltf',         # Model export format support for gltf/glb models
-    'panda3d-simplepbr',    # Physically Based Rendering (PBR) model support (Blender-exported models)
     'pyee',                 # Event interface for state change in the simulator
     'numpy',                # Number manipulation and some math functions
     'PyGLM',                # Matrix and vector math
@@ -24,8 +23,11 @@ REQUIRED = [
 ]
 
 EXTRAS = {
-    "gym": ["gym"],         #Optional Gym environment support
-    "cv": ["opencv-python"] #For some objectives
+    "gym": ["gym"],                     # Optional Gym environment support
+    "cv": ["opencv-python"],            # For some objectives
+    "pbr": [                            # Physically Based Rendering (PBR) model support (eg. Blender-exported models)
+        "panda3d-simplepbr"             # - Using panda3d-simplepbr library
+    ]
 }
 
 PACKAGE_DATA = {
@@ -34,7 +36,8 @@ PACKAGE_DATA = {
         'assets/**',
         'assets/models/**',
         'assets/scenes/**',
-        'assets/textures/**'
+        'assets/textures/**',
+        'assets/shaders/**'
     ]
 }
 

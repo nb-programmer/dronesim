@@ -1,16 +1,17 @@
 
-import os
-import typing
-PACKAGE_BASE = os.path.normpath(os.path.dirname(__file__))
+# Import major classes
 
-#Import major classes
-from dronesim.simulator import DroneSimulator
-from dronesim.interface import IDroneControllable, DroneAction, DroneState
+from dronesim.types import *
+from dronesim.app import SimulatorApplication, Panda3DEnvironment
+from dronesim.actor import VehicleModel, UAVDroneModel
 from dronesim.interface.default import DefaultDroneControl
-from dronesim.actor import UAVDroneModel
-from dronesim.simapp import SimulatorApplication
+from dronesim.interface import IDroneControllable, DroneAction, DroneState
+from dronesim.simulator import DroneSimulator
 
-def make_uav() -> typing.Tuple[DroneSimulator, IDroneControllable, UAVDroneModel]:
+from typing import Tuple
+
+
+def make_uav() -> Tuple[DroneSimulator, IDroneControllable, VehicleModel]:
     '''Simple method to create a UAV model with a simulator attached'''
     sim = DroneSimulator()
     controller = DefaultDroneControl(sim)

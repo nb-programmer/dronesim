@@ -7,6 +7,7 @@ from panda3d.core import (
 
 import os
 
+
 ASSETS_VFS = VirtualFileSystem.getGlobalPtr()
 
 def list_vfs_contents(dir : str = '/'):

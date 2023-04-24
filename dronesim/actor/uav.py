@@ -1,16 +1,16 @@
 
-from direct.actor.Actor import Actor
 from panda3d.core import NodePath, Filename
 
+from .vehicle import VehicleModel
 from dronesim.interface.control import IDroneControllable
 from dronesim.utils import rad2deg
 from dronesim.types import PandaFilePath, StateType
+from typing import Union, Dict
 
-import os
-import typing
 import random
 
-class UAVDroneModel(Actor):
+
+class UAVDroneModel(VehicleModel):
     '''
     Model class for a UAV Drone (quad, hex)-copter with separate Shell and propeller models.
     The model object can be synced to a state object via a IDroneControllable interface object.
@@ -24,25 +24,26 @@ class UAVDroneModel(Actor):
 
     :param dict propeller_spin indicates direction of spin for the given propeller bones, where value of
     '1' is clockwise, and '-1' is anti-clockwise. Direction is set to clockwise to any bones with unspecified direction.
-    
-    
+
+
     Default propeller layout is the 'Quad X' frame arrangement
-    
+
     '''
+
     def __init__(self,
-                 control_source : IDroneControllable,
-                 shell_model : typing.Union[PandaFilePath, NodePath] = None,
-                 propellers : typing.Dict[str, typing.Union[PandaFilePath, NodePath]] = None,
-                 propeller_spin : typing.Dict[str, float] = None):
+                 control_source: IDroneControllable,
+                 shell_model: Union[PandaFilePath, NodePath] = None,
+                 propellers: Dict[str, Union[PandaFilePath, NodePath]] = None,
+                 propeller_spin: Dict[str, float] = None):
         self._control_source = control_source
 
         if shell_model is None:
             shell_model = Filename("models/quad-shell.glb")
 
-        #Default propeller models
+        # Default propeller models
         if propellers is None:
             prop_model_cw = Filename("models/propeller.glb")
-            prop_model_ccw = prop_model_cw #TODO: Temporary, create a filpped model
+            prop_model_ccw = prop_model_cw  # TODO: Temporary, create a filpped model
 
             propellers = {
                 "PropellerJoint1": prop_model_ccw,
@@ -61,49 +62,52 @@ class UAVDroneModel(Actor):
         if propeller_spin is None:
             propeller_spin = dict()
 
-        propeller_spin.update({k: 1 for k in propellers.keys() if k not in propeller_spin})
+        propeller_spin.update(
+            {k: 1 for k in propellers.keys() if k not in propeller_spin})
 
-        #Prefix so that it doesn't clash with original bone node
-        propeller_parts = {'p_%s'%k:v for k,v in propellers.items()}
+        # Prefix so that it doesn't clash with original bone node
+        propeller_parts = {'p_%s' % k: v for k, v in propellers.items()}
 
         self.joints = {'propellers': {}}
 
         super().__init__({
             'modelRoot': shell_model,
             **propeller_parts
-        }, anims={'modelRoot': {}}) #To use the multipart w/o LOD loader (this is the way to do it)
+        }, anims={'modelRoot': {}})  # To use the multipart w/o LOD loader (this is the way to do it)
 
         for bone in propellers.keys():
-            #Make node accessible
+            # Make node accessible
             self.exposeJoint(None, 'modelRoot', bone)
-            self.attach('p_%s'%bone, "modelRoot", bone)
+            self.attach('p_%s' % bone, "modelRoot", bone)
             control_node = self.controlJoint(None, 'modelRoot', bone)
 
             self.joints['propellers'][bone] = {
                 'bone': control_node,
                 'spinDir': propeller_spin[bone]
             }
-            #Random rotation
-            control_node.setH(random.randint(0,360))
+            # Random rotation
+            control_node.setH(random.randint(0, 360))
 
     @property
     def controller(self) -> IDroneControllable:
         return self._control_source
 
     def update(self):
-        state : StateType = self._control_source.get_current_state()
+        state: StateType = self._control_source.get_current_state()
         if state is not None:
             state_info = state[3]
             transformState = state_info.get('state')
             if transformState is not None:
                 self.setPos(*transformState['pos'])
                 rotx, roty, rotz = transformState['angle']
-                self.setHpr(rad2deg(rotz), rad2deg(roty), rad2deg(rotx)) #TODO: Need more transformations for pitch and roll based on velocity
+                # TODO: Need more transformations for pitch and roll based on velocity
+                self.setHpr(rad2deg(rotz), rad2deg(roty), rad2deg(rotx))
                 thrust = transformState['thrust_vec']
                 prop_vel = thrust.z * 1e5
 
                 for bone in self.joints['propellers'].values():
-                    #Rotate with respect to spin direction and thrust
-                    bone['bone'].setH(bone['bone'].getH() + prop_vel*bone['spinDir'])
+                    # Rotate with respect to spin direction and thrust
+                    bone['bone'].setH(bone['bone'].getH() +
+                                      prop_vel*bone['spinDir'])
 
         super().update()

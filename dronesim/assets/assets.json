@@ -1,0 +1,62 @@
+{
+    "_1": "Default asset load config file that loads most assets found in the package's `assets` folder.",
+    "_2": "Following are the options to setup the environment and load the needed assets.",
+    "_3": "`mounts` is used to mount 'physical' directories into Panda3D's 'virtual' `VFS` structure.",
+    "_4": "This can help in accessing assets more easily in the app. For example:",
+    "_5": "You can point to a file on, say 'D:/my_folder/assets/' folder by mounting it to just '/assets/' on VFS.",
+    "_6": "You can make use of the '{abc}' syntax to substitute the value of predefined variables (see README for more info)",
+
+    "mounts": {
+        "/assets/": "{PACKAGE_BASE}/assets/"
+    },
+
+    "data": {
+        
+    },
+
+    "load": {
+        "model": {
+
+        },
+        "font": {
+
+        },
+        "texture": {
+            "tex.ui.atlas1": {
+                "path": "/assets/textures/ui_1.png",
+                "options": {
+                    "minfilter": "{SamplerState.FT_nearest}",
+                    "magfilter": "{SamplerState.FT_nearest}"
+                },
+                "data": {
+                    "hud": {
+                        "crosshair": {
+                            "uv_range": [
+                                [0.03125, -0.03125],
+                                [0.09375, -0.09375]
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "3d_texture": {
+
+        },
+        "cube_map": {
+
+        },
+        "sfx": {
+
+        },
+        "music": {
+
+        },
+        "sound": {
+
+        },
+        "shader": {
+
+        }
+    }
+}

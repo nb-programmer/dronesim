@@ -1,10 +1,9 @@
 
-from dronesim import make_uav
+from dronesim import SimulatorApplication, Panda3DEnvironment, StepRC, make_uav
 from dronesim.interface import IDroneControllable, DroneAction
-from dronesim.simapp import SimulatorApplication
-from dronesim.types import StepRC
 
 import threading
+
 
 class SimpleMovementCommandGenerator(threading.Thread):
     def __init__(self, drone_control : IDroneControllable):
@@ -23,8 +22,10 @@ def main():
     #The simulator is started automatically and is kept ticking
     drone_sim, drone_control, uav = make_uav()
 
+    env = Panda3DEnvironment("basic_env")
+
     #GUI to visualize (and control) the drone
-    drone_window = SimulatorApplication(uav)
+    drone_window = SimulatorApplication(env, uav)
 
     #Custom control class that can send movement commands to the drone
     SimpleMovementCommandGenerator(drone_control)

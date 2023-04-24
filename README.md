@@ -1,9 +1,8 @@
 # Drone Simulator
 
-This package includes modules and tools to simulate an aerial vehicle similar to a quadcopter, and
-makes it easy to use it for various A.I. applications such as path following, obstacle avoidance, etc.
+This package includes modules and tools to simulate Vehicles (`land`, `water` or `aerial` vehicles (maybe even `space` at some point)) similar to a quadcopter or rover, and makes it easy to use it for various A.I. applications such as path following, obstacle avoidance, etc.
 
-It comes with a bunch of sensors that can be attached to the UAV, such as a Camera (RGB and Depth), IMU (motion), and more to come.
+It comes with a bunch of sensors that can be attached to the Vehicle or UAV, such as a Camera (RGB and Depth), IMU (motion), and more to come.
 The simulator can have an "objective" set to generate observations for machine learning applications.
 
 ## Features
@@ -50,7 +49,7 @@ F1|Toggle visibility of HUD
 F3|Toggle visibility of debug view
 Shift+F3|Connect to Panda3D's PStats tool for profiling
 F5|Change camera mode from one of [Free, First Person or Third Person]
-F6|Toggle your control between camera and UAV
+F6|Toggle your control between camera and the Vehicle
 F11|Toggle fullscreen
 v|Show/hide all buffers
 `\`|Dump current simulator state to console
