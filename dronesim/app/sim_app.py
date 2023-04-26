@@ -11,7 +11,8 @@ from panda3d.core import (
     Spotlight,
     LPoint3f, LVecBase3f, LPoint4f,
     NodePath, TextNode, SamplerState,
-    LTexCoord,
+    LColor, LTexCoord,
+    RenderModeAttrib,
     PStatClient
 )
 
@@ -29,7 +30,7 @@ from dronesim.utils import IterEnumMixin, square_aspect2d_frame
 from .hud import HUDFieldMixin, HUDFrame, Crosshair
 from .environment import Panda3DEnvironment
 from .camera_control import FreeCam, FPCamera, TPCamera
-from .asset_manager import JSONLoader
+from .asset_manager import GLOBAL_ASSET_HOLDER
 
 from dronesim.actor import VehicleModel
 
@@ -56,18 +57,7 @@ texture-anisotropic-degree 8
 """
 loadPrcFileData("", DEFAULT_CONFIG_VARS)
 
-# Instruct the Virtual File System to mount the real 'assets/' folder to the virtual directory '/assets/'
 ASSETS_VFS = VirtualFileSystem.get_global_ptr()
-ASSETS_VFS.mount(
-    VirtualFileMountSystem(Filename.from_os_specific(
-        os.path.join(PACKAGE_BASE, 'assets/')
-    )),
-    '/assets/',
-    VirtualFileSystem.MFReadOnly
-)
-
-# Add virtual assets directory to load models and scenes from to the loader's search path
-getModelPath().prepend_directory('/assets')
 
 # Colors used for some HUD elements as foreground (text color) and background
 HUD_COLORS = dict(
@@ -77,6 +67,23 @@ HUD_COLORS = dict(
 
 LOG = logging.getLogger(__name__)
 
+
+def mount_assets_folder(vfs: VirtualFileSystem = ASSETS_VFS):
+    '''
+    Instruct the Virtual File System to mount the real `assets/` folder to the virtual directory `/assets/`
+    '''
+    vfs.mount(
+        VirtualFileMountSystem(Filename.from_os_specific(
+            os.path.join(PACKAGE_BASE, 'assets/')
+        )),
+        '/assets/',
+        VirtualFileSystem.MFReadOnly
+    )
+
+    # Add virtual assets directory to load models and scenes from to the loader's search path
+    getModelPath().prepend_directory('/assets')
+
+mount_assets_folder()
 
 def objectHUDFormatter(o):
     '''Simple JSON string formatter for various data types'''
@@ -315,6 +322,12 @@ class SimulatorApplication(ShowBase):
         else:
             self.HUD_debug_info.hide()
 
+    def eToggleWireframe(self):
+        if self.render.getRenderMode() == RenderModeAttrib.M_unchanged:
+            self.render.setRenderModeFilledWireframe(LColor(0,1,0,1))
+        else:
+            self.render.clearRenderMode()
+
     def eConnectPStats(self):
         '''Start connection with Pandas' PStats server, or disconnects from it'''
         self._toggle_pstats_connection()
@@ -427,9 +440,7 @@ class SimulatorApplication(ShowBase):
     # App/UI related
 
     def _init_assets(self):
-        assets = JSONLoader.load(
-            self.loader, self._assets_load_file, ASSETS_VFS)
-        # TODO
+        GLOBAL_ASSET_HOLDER.load_from_config(self._assets_load_file, self.loader, ASSETS_VFS)
 
     def _init_keybinds(self):
         # Buffer viewer keybind
@@ -444,6 +455,7 @@ class SimulatorApplication(ShowBase):
         self._event_hook.accept("shift-wheel_down", self.eMouseWheelScroll, [-0.25])
         self._event_hook.accept("f1", self.eToggleHUDView)
         self._event_hook.accept("f3", self.eToggleDebugView)
+        self._event_hook.accept("f8", self.eToggleWireframe)
         self._event_hook.accept("shift-f3", self.eConnectPStats)
         self._event_hook.accept("f5", self.eToggleCameraMode)
         self._event_hook.accept("f6", self.eToggleControlMode)
@@ -493,8 +505,8 @@ class SimulatorApplication(ShowBase):
         self.HUD_crosshair = Crosshair(
             "player_crosshair",
             crosshair_tex,
-            frame=square_aspect2d_frame(0.015),
-            tex_uv_range=(LTexCoord(4/128,-4/128),LTexCoord(12/128,-12/128))
+            frame=square_aspect2d_frame(0.02),
+            tex_uv_range=(LTexCoord(4/128, 1 - (11/128)), LTexCoord(11/128, 1 - (4/128)))
         )
         self.HUD_crosshair.reparent_to(self.HUD_holder)
 
@@ -525,10 +537,11 @@ class SimulatorApplication(ShowBase):
 
     @classmethod
     def formatDictToHUD(cls, d: dict, serializer: Callable[[Any], str] = str, level=0) -> str:
+        INDENT = '  '
         return '\n'.join(
             '%s%s:\n%s' % (
-                ' '*level, k, cls.formatDictToHUD(v, serializer, level+1))
+                INDENT*level, k, cls.formatDictToHUD(v, serializer, level+1))
             if isinstance(v, dict)
-            else (' '*level+k+': '+serializer(v))
+            else ('%s%s: %s' % (INDENT*level, k, serializer(v)))
             for k, v in d.items()
         )

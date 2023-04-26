@@ -50,6 +50,7 @@ F3|Toggle visibility of debug view
 Shift+F3|Connect to Panda3D's PStats tool for profiling
 F5|Change camera mode from one of [Free, First Person or Third Person]
 F6|Toggle your control between camera and the Vehicle
+F8|Toggle wireframe render
 F11|Toggle fullscreen
 v|Show/hide all buffers
 `\`|Dump current simulator state to console

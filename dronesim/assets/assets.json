@@ -25,15 +25,15 @@
             "tex.ui.atlas1": {
                 "path": "/assets/textures/ui_1.png",
                 "options": {
-                    "minfilter": "{SamplerState.FT_nearest}",
-                    "magfilter": "{SamplerState.FT_nearest}"
+                    "minfilter": "{p3dc.SamplerState.FT_nearest}",
+                    "magfilter": "{p3dc.SamplerState.FT_nearest}"
                 },
                 "data": {
                     "hud": {
                         "crosshair": {
                             "uv_range": [
-                                [0.03125, -0.03125],
-                                [0.09375, -0.09375]
+                                [0.03125, 0.90625],
+                                [0.09375, 0.96875]
                             ]
                         }
                     }
@@ -56,7 +56,7 @@
 
         },
         "shader": {
-
+            
         }
     }
 }
