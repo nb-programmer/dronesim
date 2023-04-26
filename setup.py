@@ -9,12 +9,12 @@ URL = 'https://github.com/nb-programmer/dronesim'
 EMAIL = 'narayanband1356@gmail.com'
 AUTHOR = 'nb-programmer'
 REQUIRES_PYTHON = '>=3.7.0'
-VERSION = '0.7.0'
+VERSION = '0.7.1'
 LICENSE = 'MIT'
 
 REQUIRED = [
     'Panda3D',              # The 3D engine that does all the heavy lifting of rendering, i/o and physics
-    'panda3d-gltf',         # Model export format support for gltf/glb models
+    'panda3d-gltf',         # Model import format support for gltf/glb models
     'pyee',                 # Event interface for state change in the simulator
     'numpy',                # Number manipulation and some math functions
     'PyGLM',                # Matrix and vector math
