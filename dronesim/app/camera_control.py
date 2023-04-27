@@ -1,3 +1,4 @@
+
 from panda3d.core import (
     ClockObject,
     WindowProperties
@@ -8,6 +9,11 @@ from dronesim.utils import asarray, deg2rad, clamp, modulo, sin, cos
 from direct.actor.Actor import Actor
 from dronesim.types import InputState, StepRC
 from typing import Tuple
+
+
+FLYSPEED_DEFAULT = 15.0
+FLYSPEED_MIN = 2.0
+FLYSPEED_MAX = 500.0
 
 
 class CameraControlBase:
@@ -108,7 +114,7 @@ class FreeCam(CameraControlBase):
     It controls like Blender fly mode or Counter Strike spectator mode
     '''
 
-    def __init__(self, flySpeed: float = 15.0, *args, **kwargs):
+    def __init__(self, flySpeed: float = FLYSPEED_DEFAULT, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._flySpeed = flySpeed
 
@@ -123,7 +129,7 @@ class FreeCam(CameraControlBase):
         time_wheel = self._getTickDiffTime()
         time_wheel = 1 + (10 - (20 * min(time_wheel, 0.5)))
         self._flySpeed += dir * time_wheel * 0.25
-        self._flySpeed = min(max(self._flySpeed, 2.0), 100.0)
+        self._flySpeed = min(max(self._flySpeed, FLYSPEED_MIN), FLYSPEED_MAX)
 
     def update(self,
                dt: float,

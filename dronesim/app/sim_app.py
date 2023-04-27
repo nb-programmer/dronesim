@@ -43,6 +43,7 @@ from dataclasses import dataclass
 from dronesim.types import InputState, PandaFilePath, StepRC
 from typing import Optional, Union, Callable, List, Any
 
+
 # Default config data for the app. You can set your own by using
 # loadPrcFileData or a config file before creating the Application.
 DEFAULT_CONFIG_VARS = """
@@ -58,6 +59,7 @@ texture-anisotropic-degree 8
 loadPrcFileData("", DEFAULT_CONFIG_VARS)
 
 ASSETS_VFS = VirtualFileSystem.get_global_ptr()
+LIGHT_SHADOW_CASTER = (DirectionalLight, Spotlight)
 
 # Colors used for some HUD elements as foreground (text color) and background
 HUD_COLORS = dict(
@@ -280,7 +282,7 @@ class SimulatorApplication(ShowBase):
             self.render.set_light(light)
 
             # Light types that can cast shadows
-            if isinstance(light.node(), (DirectionalLight, Spotlight)):
+            if isinstance(light.node(), LIGHT_SHADOW_CASTER):
                 # Make the light render this render path for the shadow map
                 light.node().set_scene(self.render)
                 light.node().set_shadow_caster(True, 512, 512)

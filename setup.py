@@ -9,7 +9,7 @@ URL = 'https://github.com/nb-programmer/dronesim'
 EMAIL = 'narayanband1356@gmail.com'
 AUTHOR = 'nb-programmer'
 REQUIRES_PYTHON = '>=3.7.0'
-VERSION = '0.7.1'
+VERSION = '0.7.2'
 LICENSE = 'MIT'
 
 REQUIRED = [
