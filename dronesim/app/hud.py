@@ -29,6 +29,7 @@ class HUDFrame(DirectFrame):
     def __init__(self, parent: Optional[NodePath] = None, **kwargs):
         super().__init__(parent=parent, **kwargs)
 
+
 class Crosshair(NodePath):
     # Coord system of frame is (left, right, bottom, top), and defines the bounds of the card
     # Texture UV:
@@ -36,12 +37,13 @@ class Crosshair(NodePath):
     #   V = Y-axis but from the bottom (1=bottom, 0=top)
     # So (0,1),(1,0) is the whole texture oriented from top-left to bottom-right.
 
-    TEXTURE_UV_RANGE_DEFAULT = (LTexCoord(0,1), LTexCoord(1,0))
+    TEXTURE_UV_RANGE_DEFAULT = (LTexCoord(0, 1), LTexCoord(1, 0))
+
     def __init__(self,
                  name: str,
                  tex: Texture,
-                 frame: Optional[Tuple[float,float,float,float]] = None,
-                 tex_uv_range: Tuple[LTexCoord,LTexCoord] = TEXTURE_UV_RANGE_DEFAULT):
+                 frame: Optional[Tuple[float, float, float, float]] = None,
+                 tex_uv_range: Tuple[LTexCoord, LTexCoord] = TEXTURE_UV_RANGE_DEFAULT):
         super().__init__(name)
         self._ch = CardMaker('cm_%s' % name)
         if frame is None:

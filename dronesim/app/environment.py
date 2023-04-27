@@ -9,6 +9,7 @@ from panda3d.core import (
 )
 
 from direct.showbase.Loader import Loader
+from direct.task import Task, TaskManagerGlobal
 
 from os import PathLike
 from dronesim.types import PandaFilePath
@@ -26,7 +27,8 @@ class Panda3DEnvironment(NodePath):
                                              NodePath]] = DEFAULT_SCENE,
                  attach_lights: List[Union[Light, NodePath]] = [],
                  enable_dull_ambient_light: bool = True,
-                 loader: Loader = DEFAULT_LOADER):
+                 loader: Loader = DEFAULT_LOADER,
+                 task_mgr: Task.TaskManager = TaskManagerGlobal.taskMgr):
         super().__init__(name)
 
         self._attach_lights = attach_lights
@@ -42,18 +44,19 @@ class Panda3DEnvironment(NodePath):
 
         # Load the given scene, if any
         if scene_model is not None:
-            self.load_attach_scene(scene_model)
+            # Schedule async load of the scene model
+            task_mgr.add(self.load_attach_scene(scene_model))
 
-    def load_attach_scene(self,
-                          scene_path: Union[PandaFilePath, NodePath, PandaNode],
-                          position: LVecBase3f = None,
-                          rotation: LVecBase3f = None,
-                          scale: LVecBase3f = None) -> NodePath:
+    async def load_attach_scene(self,
+                                scene_path: Union[PandaFilePath, NodePath, PandaNode],
+                                position: LVecBase3f = None,
+                                rotation: LVecBase3f = None,
+                                scale: LVecBase3f = None) -> NodePath:
         '''Attach a scene into this environment. The scene can be a NodePath, PandaNode
         or a File path to the model (physical or virtual file)'''
         if isinstance(scene_path, (str, PathLike, Filename)):
             # Load scene from given path
-            scene_model = self._loader.load_model(scene_path)
+            scene_model = await self._loader.load_model(scene_path, blocking=False)
         elif isinstance(scene_path, NodePath):
             scene_model = scene_path
         elif isinstance(scene_path, PandaNode):

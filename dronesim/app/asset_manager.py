@@ -29,6 +29,7 @@ class AnyFileReaderMixin(VFSFileReaderMixin):
             with open(file_path, 'rb') as f:
                 return f.read()
 
+
 def read_json_file(assets_file: PandaFilePath, vfs: Optional[VirtualFileSystem] = None):
     asset_conf = AnyFileReaderMixin.read_file(assets_file, vfs)
     return json.loads(asset_conf)
@@ -53,6 +54,7 @@ def loader_load_shader(cfg: dict, loader: Loader):
 ASSET_LOADERS: Dict[str, Callable[[dict, Loader], Any]] = {
     'shader': loader_load_shader
 }
+
 
 class AssetHolder(dict):
     def __init__(selfs):

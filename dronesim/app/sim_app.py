@@ -85,7 +85,9 @@ def mount_assets_folder(vfs: VirtualFileSystem = ASSETS_VFS):
     # Add virtual assets directory to load models and scenes from to the loader's search path
     getModelPath().prepend_directory('/assets')
 
+
 mount_assets_folder()
+
 
 def objectHUDFormatter(o):
     '''Simple JSON string formatter for various data types'''
@@ -326,7 +328,7 @@ class SimulatorApplication(ShowBase):
 
     def eToggleWireframe(self):
         if self.render.getRenderMode() == RenderModeAttrib.M_unchanged:
-            self.render.setRenderModeFilledWireframe(LColor(0,1,0,1))
+            self.render.setRenderModeFilledWireframe(LColor(0, 1, 0, 1))
         else:
             self.render.clearRenderMode()
 
@@ -442,7 +444,8 @@ class SimulatorApplication(ShowBase):
     # App/UI related
 
     def _init_assets(self):
-        GLOBAL_ASSET_HOLDER.load_from_config(self._assets_load_file, self.loader, ASSETS_VFS)
+        GLOBAL_ASSET_HOLDER.load_from_config(
+            self._assets_load_file, self.loader, ASSETS_VFS)
 
     def _init_keybinds(self):
         # Buffer viewer keybind
@@ -453,8 +456,10 @@ class SimulatorApplication(ShowBase):
         self._event_hook.accept("escape", self.eToggleMouseCapture)
         self._event_hook.accept("wheel_up", self.eMouseWheelScroll, [1])
         self._event_hook.accept("wheel_down", self.eMouseWheelScroll, [-1])
-        self._event_hook.accept("shift-wheel_up", self.eMouseWheelScroll, [0.25])
-        self._event_hook.accept("shift-wheel_down", self.eMouseWheelScroll, [-0.25])
+        self._event_hook.accept(
+            "shift-wheel_up", self.eMouseWheelScroll, [0.25])
+        self._event_hook.accept(
+            "shift-wheel_down", self.eMouseWheelScroll, [-0.25])
         self._event_hook.accept("f1", self.eToggleHUDView)
         self._event_hook.accept("f3", self.eToggleDebugView)
         self._event_hook.accept("f8", self.eToggleWireframe)
@@ -508,7 +513,8 @@ class SimulatorApplication(ShowBase):
             "player_crosshair",
             crosshair_tex,
             frame=square_aspect2d_frame(0.02),
-            tex_uv_range=(LTexCoord(4/128, 1 - (11/128)), LTexCoord(11/128, 1 - (4/128)))
+            tex_uv_range=(LTexCoord(4/128, 1 - (11/128)),
+                          LTexCoord(11/128, 1 - (4/128)))
         )
         self.HUD_crosshair.reparent_to(self.HUD_holder)
 
